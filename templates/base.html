@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}MediFriend - Healthcare Management{% endblock %}</title>
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages">
+        {% for category, message in messages %}
+          <div class="flash-message flash-{{ category }}">
+            <span>{{ message }}</span>
+            <button class="flash-close" onclick="this.parentElement.remove()">&times;</button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+  
+  <!-- Navigation Bar (if logged in) -->
+  {% if session.user_id %}
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <i class="fas fa-hospital"></i>
+        <span>MediFriend</span>
+      </div>
+      
+      <div class="nav-menu">
+        {% if session.role == 'PATIENT' %}
+          <a href="{{ url_for('patient.dashboard') }}" class="nav-link" title="Dashboard">
+            <i class="fas fa-home"></i>
+            <span class="nav-text">Dashboard</span>
+          </a>
+        {% elif session.role == 'DOCTOR' %}
+          <a href="{{ url_for('doctor.dashboard') }}" class="nav-link" title="Dashboard">
+            <i class="fas fa-home"></i>
+            <span class="nav-text">Dashboard</span>
+          </a>
+        {% endif %}
+        
+        <a href="#" class="nav-link" id="notificationsBtn" title="Notifications">
+          <i class="fas fa-bell"></i>
+          <span class="notification-badge">3</span>
+          <span class="nav-text">Notifications</span>
+        </a>
+        
+        <a href="{{ url_for('auth.profile') }}" class="nav-link" title="Profile">
+          <i class="fas fa-user-circle"></i>
+          <span class="nav-text">Profile</span>
+        </a>
+        
+        <a href="{{ url_for('auth.logout') }}" class="nav-link logout-link" title="Logout">
+          <i class="fas fa-sign-out-alt"></i>
+          <span class="nav-text">Logout</span>
+        </a>
+      </div>
+      
+      <div class="nav-user-mobile">
+        <span class="user-name">{{ session.full_name }}</span>
+        <button class="nav-toggle" id="navToggle">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+  {% endif %}
+  
+  <!-- Main Content -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+  
+  <!-- Footer -->
+  <footer class="footer">
+    <p>
+      © 2025 MediFriend | Your Complete Healthcare Companion
+      <i class="fa-solid fa-heart heart-icon"></i>
+    </p>
+  </footer>
+  
+  {% block extra_js %}{% endblock %}
+  
+  <script>
+    // Auto-hide flash messages after 5 seconds
+    setTimeout(() => {
+      document.querySelectorAll('.flash-message').forEach(msg => {
+        msg.style.animation = 'slideOut 0.3s ease-out';
+        setTimeout(() => msg.remove(), 300);
+      });
+    }, 5000);
+    
+    // Mobile navigation toggle
+    const navToggle = document.getElementById('navToggle');
+    const navMenu = document.querySelector('.nav-menu');
+    
+    if (navToggle) {
+      navToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+        const icon = navToggle.querySelector('i');
+        icon.classList.toggle('fa-bars');
+        icon.classList.toggle('fa-times');
+      });
+    }
+    
+    // Notification panel (placeholder for now)
+    const notificationsBtn = document.getElementById('notificationsBtn');
+    if (notificationsBtn) {
+      notificationsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        alert('Notifications feature coming soon!\n\nYou will see:\n• Appointment reminders\n• New prescriptions\n• Doctor messages\n• System updates');
+      });
+    }
+  </script>
+</body>
+</html>
