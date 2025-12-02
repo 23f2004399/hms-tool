@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Doctor Appointments - MediFriend{% endblock %}
+
+{% block content %}
+<div class="page-container">
+  <div class="page-header">
+    <h1><i class="fas fa-calendar-alt"></i> My Appointments</h1>
+    <p>View and manage patient appointments</p>
+  </div>
+  
+  <div class="info-card">
+    <i class="fas fa-tools"></i>
+    <h3>Coming Soon</h3>
+    <p>This feature is under development. You'll be able to manage appointments here.</p>
+    <a href="{{ url_for('doctor.dashboard') }}" class="btn btn-primary">
+      <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-container {
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  
+  .page-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  
+  .page-header h1 {
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 10px;
+  }
+  
+  .page-header h1 i {
+    color: #667eea;
+  }
+  
+  .page-header p {
+    color: #666;
+  }
+  
+  .info-card {
+    background: white;
+    padding: 60px 40px;
+    border-radius: 15px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  }
+  
+  .info-card i {
+    font-size: 80px;
+    color: #667eea;
+    margin-bottom: 20px;
+  }
+  
+  .info-card h3 {
+    font-size: 1.8rem;
+    color: #333;
+    margin-bottom: 15px;
+  }
+  
+  .info-card p {
+    color: #666;
+    font-size: 1.1rem;
+    margin-bottom: 30px;
+  }
+  
+  .btn {
+    display: inline-block;
+    padding: 12px 30px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - MediFriend{% endblock %}
+
+{% block content %}
+<div class="page-container">
+  <div class="page-header">
+    <h1><i class="fas fa-user-circle"></i> My Profile</h1>
+    <p>View and update your information</p>
+  </div>
+  
+  <div class="profile-card">
+    <h2>{{ user.full_name }}</h2>
+    <p class="role-badge">{{ role }}</p>
+    
+    <div class="profile-details">
+      <div class="detail-row">
+        <strong><i class="fas fa-envelope"></i> Email:</strong>
+        <span>{{ user.email }}</span>
+      </div>
+      
+      {% if user.phone %}
+      <div class="detail-row">
+        <strong><i class="fas fa-phone"></i> Phone:</strong>
+        <span>{{ user.phone }}</span>
+      </div>
+      {% endif %}
+      
+      {% if user.gender %}
+      <div class="detail-row">
+        <strong><i class="fas fa-venus-mars"></i> Gender:</strong>
+        <span>{{ user.gender }}</span>
+      </div>
+      {% endif %}
+      
+      {% if user.dob %}
+      <div class="detail-row">
+        <strong><i class="fas fa-calendar"></i> Date of Birth:</strong>
+        <span>{{ user.dob }}</span>
+      </div>
+      {% endif %}
+      
+      {% if role == 'PATIENT' %}
+        {% if user.blood_group %}
+        <div class="detail-row">
+          <strong><i class="fas fa-tint"></i> Blood Group:</strong>
+          <span>{{ user.blood_group }}</span>
+        </div>
+        {% endif %}
+        
+        {% if user.allergies %}
+        <div class="detail-row">
+          <strong><i class="fas fa-allergies"></i> Allergies:</strong>
+          <span>{{ user.allergies }}</span>
+        </div>
+        {% endif %}
+        
+        {% if user.chronic_conditions %}
+        <div class="detail-row">
+          <strong><i class="fas fa-notes-medical"></i> Chronic Conditions:</strong>
+          <span>{{ user.chronic_conditions }}</span>
+        </div>
+        {% endif %}
+        
+        {% if user.emergency_contact %}
+        <div class="detail-row">
+          <strong><i class="fas fa-phone-square"></i> Emergency Contact:</strong>
+          <span>{{ user.emergency_contact }}</span>
+        </div>
+        {% endif %}
+      {% elif role == 'DOCTOR' %}
+        {% if user.specialization %}
+        <div class="detail-row">
+          <strong><i class="fas fa-stethoscope"></i> Specialization:</strong>
+          <span>{{ user.specialization }}</span>
+        </div>
+        {% endif %}
+        
+        {% if user.experience_years %}
+        <div class="detail-row">
+          <strong><i class="fas fa-award"></i> Experience:</strong>
+          <span>{{ user.experience_years }} years</span>
+        </div>
+        {% endif %}
+        
+        {% if user.consultation_fee %}
+        <div class="detail-row">
+          <strong><i class="fas fa-rupee-sign"></i> Consultation Fee:</strong>
+          <span>₹{{ user.consultation_fee }}</span>
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+    
+    <div class="profile-actions">
+      {% if role == 'PATIENT' %}
+        <a href="{{ url_for('patient.dashboard') }}" class="btn btn-secondary">
+          <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+      {% else %}
+        <a href="{{ url_for('doctor.dashboard') }}" class="btn btn-secondary">
+          <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  .page-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  
+  .page-header h1 {
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 10px;
+  }
+  
+  .page-header h1 i {
+    color: #667eea;
+  }
+  
+  .page-header p {
+    color: #666;
+  }
+  
+  .profile-card {
+    background: white;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  }
+  
+  .profile-card h2 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 2rem;
+  }
+  
+  .role-badge {
+    text-align: center;
+    display: inline-block;
+    width: 100%;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 20px;
+    font-weight: 600;
+    margin-bottom: 30px;
+  }
+  
+  .profile-details {
+    margin: 30px 0;
+  }
+  
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .detail-row:last-child {
+    border-bottom: none;
+  }
+  
+  .detail-row strong {
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .detail-row strong i {
+    color: #667eea;
+  }
+  
+  .detail-row span {
+    color: #666;
+  }
+  
+  .profile-actions {
+    text-align: center;
+    margin-top: 30px;
+  }
+  
+  .btn {
+    display: inline-block;
+    padding: 12px 30px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  
+  .btn-secondary {
+    background: #6c757d;
+    color: white;
+  }
+  
+  .btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(108, 117, 125, 0.3);
+  }
+</style>
+{% endblock %}

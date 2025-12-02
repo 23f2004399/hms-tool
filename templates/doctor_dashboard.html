@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}Doctor Dashboard - MediFriend{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1>Welcome, <span class="highlight">Dr. {{ doctor_name }}</span>!</h1>
+    <p>Manage your patients and appointments</p>
+  </div>
+  
+  <div class="dashboard-grid">
+    <!-- Quick Actions -->
+    <div class="dashboard-card action-card">
+      <a href="{{ url_for('doctor.appointments') }}" class="action-link">
+        <i class="fas fa-calendar-alt"></i>
+        <h3>My Appointments</h3>
+        <p>View and manage appointments</p>
+      </a>
+    </div>
+    
+    <div class="dashboard-card action-card">
+      <a href="{{ url_for('doctor.patients') }}" class="action-link">
+        <i class="fas fa-user-injured"></i>
+        <h3>My Patients</h3>
+        <p>Access patient records</p>
+      </a>
+    </div>
+    
+    <div class="dashboard-card action-card">
+      <a href="#" class="action-link">
+        <i class="fas fa-prescription"></i>
+        <h3>Write Prescription</h3>
+        <p>Create prescriptions for patients</p>
+      </a>
+    </div>
+    
+    <div class="dashboard-card action-card">
+      <a href="{{ url_for('auth.profile') }}" class="action-link">
+        <i class="fas fa-user-md"></i>
+        <h3>My Profile</h3>
+        <p>Update your information</p>
+      </a>
+    </div>
+  </div>
+  
+  <div class="stats-section">
+    <h2>Quick Statistics</h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <i class="fas fa-clock"></i>
+        <h3>Pending Appointments</h3>
+        <p class="stat-number">Coming soon</p>
+      </div>
+      
+      <div class="stat-card">
+        <i class="fas fa-check-circle"></i>
+        <h3>Today's Appointments</h3>
+        <p class="stat-number">Coming soon</p>
+      </div>
+      
+      <div class="stat-card">
+        <i class="fas fa-users"></i>
+        <h3>Total Patients</h3>
+        <p class="stat-number">Coming soon</p>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Floating AI Tools -->
+  <div class="floating-tools">
+    <a href="{{ url_for('medical_bot') }}" class="floating-tool chatbot-tool" data-tooltip="Medical Assistant Bot">
+      <i class="fas fa-robot"></i>
+    </a>
+    
+    <a href="{{ url_for('prescription_reader') }}" class="floating-tool prescription-tool" data-tooltip="Prescription Reader">
+      <i class="fas fa-file-medical"></i>
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .dashboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .dashboard-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  
+  .dashboard-header h1 {
+    font-size: 2.5rem;
+    color: #333;
+    margin-bottom: 10px;
+  }
+  
+  .dashboard-header .highlight {
+    color: #667eea;
+  }
+  
+  .dashboard-header p {
+    color: #666;
+    font-size: 1.1rem;
+  }
+  
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+    margin-bottom: 40px;
+  }
+  
+  .dashboard-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: all 0.3s;
+  }
+  
+  .dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+  }
+  
+  .action-link {
+    display: block;
+    padding: 30px;
+    text-decoration: none;
+    color: inherit;
+    text-align: center;
+  }
+  
+  .action-link i {
+    font-size: 50px;
+    color: #667eea;
+    margin-bottom: 15px;
+  }
+  
+  .action-link h3 {
+    color: #333;
+    margin: 10px 0;
+    font-size: 1.3rem;
+  }
+  
+  .action-link p {
+    color: #666;
+    font-size: 0.95rem;
+  }
+  
+  .stats-section {
+    margin-top: 50px;
+  }
+  
+  .stats-section h2 {
+    color: #333;
+    margin-bottom: 20px;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+  }
+  
+  .stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 12px;
+    text-align: center;
+  }
+  
+  .stat-card i {
+    font-size: 40px;
+    margin-bottom: 10px;
+  }
+  
+  .stat-card h3 {
+    font-size: 1rem;
+    margin: 10px 0;
+    font-weight: 500;
+  }
+  
+  .stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 10px 0;
+  }
+  
+  /* Floating AI Tools */
+  .floating-tools {
+    position: fixed;
+    right: 30px;
+    bottom: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    z-index: 1000;
+  }
+  
+  .floating-tool {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: white;
+    font-size: 24px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  
+  .chatbot-tool {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .prescription-tool {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
+  
+  .floating-tool:hover {
+    transform: scale(1.1) translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+  }
+  
+  .floating-tool::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    right: 75px;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 8px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+    pointer-events: none;
+  }
+  
+  .floating-tool::after {
+    content: '';
+    position: absolute;
+    right: 65px;
+    border: 8px solid transparent;
+    border-left-color: rgba(0,0,0,0.85);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+  }
+  
+  .floating-tool:hover::before,
+  .floating-tool:hover::after {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  @media (max-width: 768px) {
+    .floating-tools {
+      right: 20px;
+      bottom: 20px;
+    }
+    
+    .floating-tool {
+      width: 50px;
+      height: 50px;
+      font-size: 20px;
+    }
+  }
+</style>
+{% endblock %}

@@ -1,25 +1,36 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import os, base64, yaml, cv2, numpy as np
 import google.generativeai as genai
 import uuid
+
+# Import configuration and routes
+from config import Config
+from routes.auth import auth_bp, login_required
+from routes.patient import patient_bp
+from routes.doctor import doctor_bp
+from database import init_db
 
 # --------------------------------------------------
 # ⚙️ Flask App Configuration
 # --------------------------------------------------
 app = Flask(__name__)
-app.secret_key = "mysupersecretkey"
+app.config.from_object(Config)
+
+# Initialize database on app startup
+init_db()
+
+# Register blueprints
+app.register_blueprint(auth_bp, url_prefix='/auth')
+app.register_blueprint(patient_bp)
+app.register_blueprint(doctor_bp)
 
 # Store chats in memory
 chat_sessions = {}
+
 # --------------------------------------------------
-# 🔑 Load Gemini API key
+# 🔑 Configure Gemini API
 # --------------------------------------------------
-with open("keys.yaml", "r") as f:
-    keys = yaml.safe_load(f)
-GEMINI_API_KEY = keys.get("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY not found in keys.yaml!")
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(api_key=Config.GEMINI_API_KEY)
 
 # Use Gemini Vision model
 model = genai.GenerativeModel("gemini-2.5-pro")
@@ -40,10 +51,21 @@ def get_logo_data():
 # --------------------------------------------------
 @app.route('/')
 def home():
+    """Home page - shows different options based on login status"""
+    if 'user_id' in session:
+        # Redirect logged-in users to their dashboard
+        if session.get('role') == 'DOCTOR':
+            return redirect(url_for('doctor.dashboard'))
+        else:
+            return redirect(url_for('patient.dashboard'))
+    
     return render_template('index.html', logo_data=get_logo_data())
 
+
 @app.route('/prescription-reader')
+@login_required
 def prescription_reader():
+    """Prescription reader (requires login)"""
     return render_template('prescription_reader.html', logo_data=get_logo_data())
 
 # --------------------------------------------------
@@ -224,7 +246,9 @@ def reset_chat():
 
 
 @app.route('/medical_bot')
+@login_required
 def medical_bot():
+    """Medical chatbot (requires login)"""
     logo_data = get_logo_data()
     return render_template('medical_bot.html', logo_data=logo_data)
 

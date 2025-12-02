@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Login - MediFriend{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-header">
+      <i class="fas fa-hospital-user"></i>
+      <h1>Welcome to <span class="highlight">MediFriend</span></h1>
+      <p>Your Healthcare Companion</p>
+    </div>
+    
+    <form method="POST" action="{{ url_for('auth.login') }}" class="auth-form">
+      <div class="form-group">
+        <label for="email">
+          <i class="fas fa-envelope"></i> Email Address
+        </label>
+        <input type="email" id="email" name="email" required 
+               placeholder="Enter your email" class="form-control">
+      </div>
+      
+      <div class="form-group">
+        <label for="password">
+          <i class="fas fa-lock"></i> Password
+        </label>
+        <input type="password" id="password" name="password" required 
+               placeholder="Enter your password" class="form-control">
+      </div>
+      
+      <button type="submit" class="btn btn-primary btn-block">
+        <i class="fas fa-sign-in-alt"></i> Login
+      </button>
+    </form>
+    
+    <div class="auth-footer">
+      <p>Don't have an account?</p>
+      <div class="signup-links">
+        <a href="{{ url_for('auth.signup') }}" class="signup-link patient-link">
+          <i class="fas fa-user-plus"></i> Sign up as Patient
+        </a>
+        <a href="{{ url_for('auth.doctor_signup') }}" class="signup-link doctor-link">
+          <i class="fas fa-user-md"></i> Sign up as Doctor
+        </a>
+      </div>
+      <p><a href="{{ url_for('home') }}">← Back to Home</a></p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .auth-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .auth-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    padding: 40px;
+    width: 100%;
+    max-width: 450px;
+  }
+  
+  .auth-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .auth-header i {
+    font-size: 60px;
+    color: #667eea;
+    margin-bottom: 15px;
+  }
+  
+  .auth-header h1 {
+    font-size: 2rem;
+    margin: 10px 0;
+    color: #333;
+  }
+  
+  .auth-header .highlight {
+    color: #667eea;
+  }
+  
+  .auth-header p {
+    color: #666;
+    font-size: 0.95rem;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #333;
+    font-weight: 500;
+  }
+  
+  .form-group label i {
+    color: #667eea;
+    margin-right: 5px;
+  }
+  
+  .form-control {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s;
+  }
+  
+  .form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+  }
+  
+  .btn-block {
+    width: 100%;
+  }
+  
+  .auth-footer {
+    text-align: center;
+    margin-top: 25px;
+  }
+  
+  .auth-footer p {
+    margin: 10px 0;
+    color: #666;
+  }
+  
+  .signup-links {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin: 15px 0;
+    flex-wrap: wrap;
+  }
+  
+  .signup-link {
+    padding: 10px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .patient-link {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .patient-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+  }
+  
+  .doctor-link {
+    background: linear-gradient(135deg, #2a7de1 0%, #1a5cb8 100%);
+    color: white;
+  }
+  
+  .doctor-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(42, 125, 225, 0.4);
+  }
+  
+  .auth-footer > p > a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .auth-footer a:hover {
+    text-decoration: underline;
+  }
+</style>
+{% endblock %}

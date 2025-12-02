@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Up - MediFriend{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+  <div class="auth-card signup-card">
+    <div class="auth-header">
+      <i class="fas fa-user-plus"></i>
+      <h1>Create Patient Account</h1>
+      <p>Join MediFriend Healthcare Platform</p>
+    </div>
+    
+    <form method="POST" action="{{ url_for('auth.signup') }}" class="auth-form">
+      <!-- Basic Information -->
+      <h3 class="section-title">Basic Information</h3>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label for="full_name">
+            <i class="fas fa-user"></i> Full Name *
+          </label>
+          <input type="text" id="full_name" name="full_name" required 
+                 placeholder="John Doe" class="form-control">
+        </div>
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label for="email">
+            <i class="fas fa-envelope"></i> Email Address *
+          </label>
+          <input type="email" id="email" name="email" required 
+                 placeholder="john@example.com" class="form-control">
+        </div>
+        
+        <div class="form-group">
+          <label for="phone">
+            <i class="fas fa-phone"></i> Phone Number
+          </label>
+          <div class="phone-input-group">
+            <select id="country_code" name="country_code" class="form-control country-code">
+              <option value="+1">🇺🇸 +1</option>
+              <option value="+91" selected>🇮🇳 +91</option>
+              <option value="+44">🇬🇧 +44</option>
+              <option value="+86">🇨🇳 +86</option>
+              <option value="+81">🇯🇵 +81</option>
+              <option value="+49">🇩🇪 +49</option>
+              <option value="+33">🇫🇷 +33</option>
+              <option value="+61">🇦🇺 +61</option>
+              <option value="+7">🇷🇺 +7</option>
+              <option value="+82">🇰🇷 +82</option>
+              <option value="+92">🇵🇰 +92</option>
+              <option value="+880">🇧🇩 +880</option>
+              <option value="+971">🇦🇪 +971</option>
+              <option value="+966">🇸🇦 +966</option>
+              <option value="+65">🇸🇬 +65</option>
+            </select>
+            <input type="tel" id="phone" name="phone" 
+                   placeholder="234 567 8900" class="form-control phone-number">
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label for="gender">
+            <i class="fas fa-venus-mars"></i> Gender
+          </label>
+          <select id="gender" name="gender" class="form-control">
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="dob">
+            <i class="fas fa-calendar"></i> Date of Birth
+          </label>
+          <input type="date" id="dob" name="dob" class="form-control">
+        </div>
+      </div>
+      
+      <!-- Medical Information -->
+      <h3 class="section-title">Medical Information (Optional)</h3>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label for="blood_group">
+            <i class="fas fa-tint"></i> Blood Group
+          </label>
+          <select id="blood_group" name="blood_group" class="form-control">
+            <option value="">Select Blood Group</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="emergency_contact">
+            <i class="fas fa-phone-square"></i> Emergency Contact
+          </label>
+          <div class="phone-input-group">
+            <select id="emergency_country_code" name="emergency_country_code" class="form-control country-code">
+              <option value="+1">🇺🇸 +1</option>
+              <option value="+91" selected>🇮🇳 +91</option>
+              <option value="+44">🇬🇧 +44</option>
+              <option value="+86">🇨🇳 +86</option>
+              <option value="+81">🇯🇵 +81</option>
+              <option value="+49">🇩🇪 +49</option>
+              <option value="+33">🇫🇷 +33</option>
+              <option value="+61">🇦🇺 +61</option>
+              <option value="+7">🇷🇺 +7</option>
+              <option value="+82">🇰🇷 +82</option>
+              <option value="+92">🇵🇰 +92</option>
+              <option value="+880">🇧🇩 +880</option>
+              <option value="+971">🇦🇪 +971</option>
+              <option value="+966">🇸🇦 +966</option>
+              <option value="+65">🇸🇬 +65</option>
+            </select>
+            <input type="tel" id="emergency_contact" name="emergency_contact" 
+                   placeholder="234 567 8900" class="form-control phone-number">
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="allergies">
+          <i class="fas fa-allergies"></i> Allergies
+        </label>
+        <input type="text" id="allergies" name="allergies" 
+               placeholder="e.g., Peanuts, Penicillin" class="form-control">
+      </div>
+      
+      <div class="form-group">
+        <label for="chronic_conditions">
+          <i class="fas fa-notes-medical"></i> Chronic Conditions
+        </label>
+        <input type="text" id="chronic_conditions" name="chronic_conditions" 
+               placeholder="e.g., Diabetes, Hypertension" class="form-control">
+      </div>
+      
+      <!-- Password -->
+      <h3 class="section-title">Security</h3>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label for="password">
+            <i class="fas fa-lock"></i> Password *
+          </label>
+          <input type="password" id="password" name="password" required 
+                 placeholder="Minimum 6 characters" class="form-control">
+        </div>
+        
+        <div class="form-group">
+          <label for="confirm_password">
+            <i class="fas fa-lock"></i> Confirm Password *
+          </label>
+          <input type="password" id="confirm_password" name="confirm_password" required 
+                 placeholder="Re-enter password" class="form-control">
+        </div>
+      </div>
+      
+      <button type="submit" class="btn btn-primary btn-block">
+        <i class="fas fa-user-plus"></i> Create Account
+      </button>
+    </form>
+    
+    <div class="auth-footer">
+      <p>Already have an account? <a href="{{ url_for('auth.login') }}">Login here</a></p>
+      <p><a href="{{ url_for('home') }}">← Back to Home</a></p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .auth-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .signup-card {
+    max-width: 700px;
+  }
+  
+  .auth-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    padding: 40px;
+    width: 100%;
+  }
+  
+  .auth-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .auth-header i {
+    font-size: 60px;
+    color: #667eea;
+    margin-bottom: 15px;
+  }
+  
+  .auth-header h1 {
+    font-size: 1.8rem;
+    margin: 10px 0;
+    color: #333;
+  }
+  
+  .auth-header p {
+    color: #666;
+    font-size: 0.95rem;
+  }
+  
+  .section-title {
+    color: #667eea;
+    font-size: 1.1rem;
+    margin: 25px 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+  }
+  
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .phone-input-group {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .country-code {
+    flex: 0 0 110px;
+    font-size: 0.9rem;
+  }
+  
+  .phone-number {
+    flex: 1;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    color: #333;
+    font-weight: 500;
+    font-size: 0.9rem;
+  }
+  
+  .form-group label i {
+    color: #667eea;
+    margin-right: 5px;
+  }
+  
+  .form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.3s;
+  }
+  
+  .form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  select.form-control {
+    cursor: pointer;
+  }
+  
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 10px;
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+  }
+  
+  .btn-block {
+    width: 100%;
+  }
+  
+  .auth-footer {
+    text-align: center;
+    margin-top: 25px;
+  }
+  
+  .auth-footer p {
+    margin: 8px 0;
+    color: #666;
+    font-size: 0.9rem;
+  }
+  
+  .auth-footer a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .auth-footer a:hover {
+    text-decoration: underline;
+  }
+  
+  @media (max-width: 768px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
