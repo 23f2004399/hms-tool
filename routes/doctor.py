@@ -7,7 +7,7 @@ from database import (
     get_doctor_appointments, update_appointment_status, get_doctor_patients,
     get_patient_details, create_prescription, create_notification, execute_query,
     get_user_notifications, get_unread_notification_count, mark_notifications_as_read,
-    delete_read_notifications, get_doctor_stats
+    delete_read_notifications, get_doctor_stats, search_patients
 )
 import json
 
@@ -245,3 +245,40 @@ def mark_notifications_read():
     mark_notifications_as_read(user_id)
     delete_read_notifications(user_id)
     return jsonify({'success': True})
+
+
+@doctor_bp.route('/api/search-patients', methods=['GET'])
+@role_required('DOCTOR')
+def api_search_patients():
+    """
+    AJAX endpoint for searching patients
+    Returns JSON results for live search
+    """
+    query = request.args.get('q', '').strip()
+    doctor_id = session.get('user_id')
+    
+    if not query or len(query) < 2:
+        return jsonify({'success': False, 'message': 'Query too short', 'patients': []})
+    
+    try:
+        # Search only this doctor's patients
+        patients = search_patients(query, doctor_id)
+        
+        # Format results for frontend
+        results = [{
+            'id': patient['id'],
+            'name': patient['full_name'],
+            'email': patient['email'],
+            'phone': patient['phone'] or 'N/A',
+            'gender': patient['gender'] or 'N/A',
+            'blood_group': patient['blood_group'] or 'N/A'
+        } for patient in patients]
+        
+        return jsonify({
+            'success': True,
+            'count': len(results),
+            'patients': results
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e), 'patients': []})

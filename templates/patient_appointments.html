@@ -64,6 +64,10 @@
             <i class="fas fa-times"></i> Cancel
           </button>
         </form>
+        {% elif appointment.status == 'COMPLETED' or appointment.status == 'REJECTED' %}
+        <a href="{{ url_for('patient.rate_doctor', appointment_id=appointment.id) }}" class="btn-rate">
+          <i class="fas fa-star"></i> Rate Doctor
+        </a>
         {% endif %}
       </div>
     </div>
@@ -354,6 +358,29 @@
     transform: translateY(-2px);
   }
   
+  .btn-rate {
+    padding: 8px 20px;
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s;
+  }
+  
+  .btn-rate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+  }
+  
+  .btn-rate i {
+    font-size: 14px;
+  }
+  
   /* Info Card */
   .info-card {
     background: white;
@@ -403,23 +430,29 @@
   }
   
   .back-link {
+    margin-top: 40px;
     text-align: center;
-    margin-top: 30px;
   }
   
   .back-link a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 30px;
+    background: white;
     color: #667eea;
+    border: 2px solid #667eea;
+    border-radius: 10px;
     text-decoration: none;
     font-weight: 600;
-    transition: color 0.3s;
+    transition: all 0.3s;
   }
   
   .back-link a:hover {
-    color: #764ba2;
-  }
-  
-  .back-link i {
-    margin-right: 5px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
   }
   
   @media (max-width: 768px) {

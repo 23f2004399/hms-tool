@@ -9,8 +9,20 @@
     <p>Access patient records and medical history</p>
   </div>
   
+  <!-- Search Bar -->
+  <div class="search-container">
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" id="patientSearch" placeholder="Search patients by name, email, or phone..." autocomplete="off">
+      <button type="button" id="clearSearch" class="clear-search" style="display: none;">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="search-results" id="searchResults" style="display: none;"></div>
+  </div>
+  
   {% if patients %}
-  <div class="patients-grid">
+  <div class="patients-grid" id="patientsGrid">
     {% for patient in patients %}
     <div class="patient-card">
       <div class="patient-header">
@@ -351,23 +363,158 @@
   }
   
   .back-link {
+    margin-top: 40px;
     text-align: center;
-    margin-top: 30px;
   }
   
   .back-link a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 30px;
+    background: white;
     color: #667eea;
+    border: 2px solid #667eea;
+    border-radius: 10px;
     text-decoration: none;
     font-weight: 600;
-    transition: color 0.3s;
+    transition: all 0.3s;
   }
   
   .back-link a:hover {
-    color: #764ba2;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
   }
   
-  .back-link i {
-    margin-right: 5px;
+  /* Search Styles */
+  .search-container {
+    margin-bottom: 30px;
+    position: relative;
+  }
+  
+  .search-box {
+    position: relative;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .search-box i.fa-search {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #667eea;
+    font-size: 18px;
+  }
+  
+  .search-box input {
+    width: 100%;
+    padding: 15px 50px 15px 45px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.3s;
+    background: white;
+  }
+  
+  .search-box input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .clear-search {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 5px 10px;
+    transition: color 0.3s;
+  }
+  
+  .clear-search:hover {
+    color: #667eea;
+  }
+  
+  .search-results {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 600px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1000;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .search-results::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .search-result-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .search-result-item:last-child {
+    border-bottom: none;
+  }
+  
+  .search-result-item:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  }
+  
+  .search-result-header {
+    font-weight: 600;
+    color: #333;
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+  
+  .search-result-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    font-size: 0.9rem;
+    color: #666;
+  }
+  
+  .search-result-details span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  
+  .search-result-details i {
+    color: #667eea;
+    font-size: 13px;
+  }
+  
+  .search-empty {
+    padding: 30px;
+    text-align: center;
+    color: #999;
+  }
+  
+  .search-empty i {
+    font-size: 40px;
+    margin-bottom: 10px;
+    color: #ddd;
   }
   
   @media (max-width: 768px) {
@@ -381,4 +528,167 @@
     }
   }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Search functionality
+let searchTimeout;
+const searchInput = document.getElementById('patientSearch');
+const clearBtn = document.getElementById('clearSearch');
+const searchResults = document.getElementById('searchResults');
+const patientsGrid = document.getElementById('patientsGrid');
+const originalPatients = patientsGrid.innerHTML; // Save original list
+
+// Handle search input
+searchInput.addEventListener('input', function() {
+  const query = this.value.trim();
+  
+  // Show/hide clear button
+  clearBtn.style.display = query ? 'block' : 'none';
+  
+  // Clear previous timeout
+  clearTimeout(searchTimeout);
+  
+  if (query.length < 2) {
+    searchResults.style.display = 'none';
+    patientsGrid.innerHTML = originalPatients; // Restore original list
+    return;
+  }
+  
+  // Debounce search - wait 300ms after user stops typing
+  searchTimeout = setTimeout(() => {
+    performSearch(query);
+  }, 300);
+});
+
+// Clear search
+clearBtn.addEventListener('click', function() {
+  searchInput.value = '';
+  clearBtn.style.display = 'none';
+  searchResults.style.display = 'none';
+  patientsGrid.innerHTML = originalPatients;
+  searchInput.focus();
+});
+
+// Close search results when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.search-container')) {
+    searchResults.style.display = 'none';
+  }
+});
+
+// Perform AJAX search
+async function performSearch(query) {
+  try {
+    const response = await fetch(`/doctor/api/search-patients?q=${encodeURIComponent(query)}`);
+    const data = await response.json();
+    
+    if (data.success && data.patients.length > 0) {
+      displaySearchResults(data.patients);
+      updatePatientsGrid(data.patients);
+    } else {
+      showEmptyResults();
+      patientsGrid.innerHTML = '<div class="info-card"><i class="fas fa-search"></i><h3>No Patients Found</h3><p>No patients match your search criteria</p></div>';
+    }
+  } catch (error) {
+    console.error('Search error:', error);
+    searchResults.innerHTML = '<div class="search-empty"><p>Error performing search</p></div>';
+    searchResults.style.display = 'block';
+  }
+}
+
+// Display search results in dropdown
+function displaySearchResults(patients) {
+  const resultsHTML = patients.map(patient => {
+    return `
+      <div class="search-result-item" data-patient-id="${patient.id}">
+        <div class="search-result-header">${patient.name}</div>
+        <div class="search-result-details">
+          <span><i class="fas fa-envelope"></i> ${patient.email}</span>
+          <span><i class="fas fa-phone"></i> ${patient.phone}</span>
+          ${patient.gender !== 'N/A' ? `<span><i class="fas fa-venus-mars"></i> ${patient.gender}</span>` : ''}
+          ${patient.blood_group !== 'N/A' ? `<span><i class="fas fa-tint"></i> ${patient.blood_group}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  searchResults.innerHTML = resultsHTML;
+  searchResults.style.display = 'block';
+  
+  // Add click handlers to scroll to patient
+  document.querySelectorAll('.search-result-item').forEach(item => {
+    item.addEventListener('click', function() {
+      const patientId = this.dataset.patientId;
+      // Scroll to patient card in main grid
+      const patientCard = document.querySelector(`[data-patient-id="${patientId}"]`);
+      if (patientCard && patientCard.closest('.patient-card')) {
+        patientCard.closest('.patient-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Highlight the card briefly
+        patientCard.closest('.patient-card').style.boxShadow = '0 8px 30px rgba(102, 126, 234, 0.4)';
+        setTimeout(() => {
+          patientCard.closest('.patient-card').style.boxShadow = '';
+        }, 2000);
+      }
+      searchResults.style.display = 'none';
+    });
+  });
+}
+
+// Update main patients grid with search results
+function updatePatientsGrid(patients) {
+  const gridHTML = patients.map(patient => {
+    return `
+      <div class="patient-card" data-patient-id="${patient.id}">
+        <div class="patient-header">
+          <div class="patient-avatar">
+            <i class="fas fa-user"></i>
+          </div>
+          <div class="patient-basic-info">
+            <h3>${patient.name}</h3>
+            <p class="patient-meta">
+              ${patient.gender !== 'N/A' ? `<span><i class="fas fa-venus-mars"></i> ${patient.gender}</span>` : ''}
+            </p>
+          </div>
+        </div>
+        
+        <div class="patient-contact">
+          <div class="contact-item">
+            <i class="fas fa-phone"></i>
+            <span>${patient.phone}</span>
+          </div>
+          <div class="contact-item">
+            <i class="fas fa-envelope"></i>
+            <span>${patient.email}</span>
+          </div>
+        </div>
+        
+        <div class="patient-medical">
+          ${patient.blood_group !== 'N/A' ? `<div class="medical-badge"><i class="fas fa-tint"></i> ${patient.blood_group}</div>` : ''}
+        </div>
+        
+        <div class="patient-actions">
+          <a href="/doctor/write-prescription/${patient.id}" class="btn btn-primary">
+            <i class="fas fa-prescription"></i> Write Prescription
+          </a>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  patientsGrid.innerHTML = gridHTML;
+}
+
+// Show empty results
+function showEmptyResults() {
+  searchResults.innerHTML = `
+    <div class="search-empty">
+      <i class="fas fa-search"></i>
+      <p>No patients found</p>
+    </div>
+  `;
+  searchResults.style.display = 'block';
+}
+</script>
 {% endblock %}
