@@ -47,24 +47,37 @@
       {% if prescription.medicines_json %}
       <div class="prescription-section">
         <h4><i class="fas fa-pills"></i> Prescribed Medicines</h4>
-        <div class="medicines-list">
-          {% set medicines = prescription.medicines_json|from_json %}
-          {% if medicines is iterable and medicines is not string %}
-            {% for medicine in medicines %}
-            <div class="medicine-item">
-              <div class="medicine-name">{{ medicine.name if medicine.name else medicine }}</div>
-              {% if medicine.dosage %}
-              <div class="medicine-dosage">{{ medicine.dosage }}</div>
-              {% endif %}
-              {% if medicine.duration %}
-              <div class="medicine-duration">Duration: {{ medicine.duration }}</div>
-              {% endif %}
-            </div>
-            {% endfor %}
-          {% else %}
-            <p>{{ prescription.medicines_json }}</p>
-          {% endif %}
+        {% set medicines = prescription.medicines_json|from_json %}
+        {% if medicines is iterable and medicines is not string and medicines|length > 0 %}
+        <div class="medicine-table-container">
+          <table class="medicine-table">
+            <thead>
+              <tr>
+                <th><i class="fas fa-capsules"></i> Medicine</th>
+                <th><i class="fas fa-prescription-bottle"></i> Dosage</th>
+                <th><i class="fas fa-clock"></i> Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for medicine in medicines %}
+              <tr>
+                <td class="medicine-name-cell">
+                  <span class="medicine-name-text">{{ medicine.name if medicine.name else medicine }}</span>
+                </td>
+                <td class="medicine-dosage-cell">
+                  {{ medicine.dosage if medicine.dosage else '-' }}
+                </td>
+                <td class="medicine-duration-cell">
+                  {{ medicine.duration if medicine.duration else '-' }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
+        {% else %}
+          <p>{{ prescription.medicines_json }}</p>
+        {% endif %}
       </div>
       {% endif %}
       
@@ -140,18 +153,31 @@
       {% if data.medicines %}
       <div class="prescription-section">
         <h4><i class="fas fa-pills"></i> Prescribed Medicines</h4>
-        <div class="medicines-list">
-          {% for medicine in data.medicines %}
-          <div class="medicine-item">
-            <div class="medicine-name">{{ medicine.name if medicine.name else medicine }}</div>
-            {% if medicine.dosage %}
-            <div class="medicine-dosage">{{ medicine.dosage }}</div>
-            {% endif %}
-            {% if medicine.duration %}
-            <div class="medicine-duration">Duration: {{ medicine.duration }}</div>
-            {% endif %}
-          </div>
-          {% endfor %}
+        <div class="medicine-table-container">
+          <table class="medicine-table">
+            <thead>
+              <tr>
+                <th><i class="fas fa-capsules"></i> Medicine</th>
+                <th><i class="fas fa-prescription-bottle"></i> Dosage</th>
+                <th><i class="fas fa-clock"></i> Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for medicine in data.medicines %}
+              <tr>
+                <td class="medicine-name-cell">
+                  <span class="medicine-name-text">{{ medicine.name if medicine.name else medicine }}</span>
+                </td>
+                <td class="medicine-dosage-cell">
+                  {{ medicine.dosage if medicine.dosage else '-' }}
+                </td>
+                <td class="medicine-duration-cell">
+                  {{ medicine.duration if medicine.duration else '-' }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </div>
       {% endif %}
@@ -359,6 +385,109 @@ function uploadPrescription(input) {
     gap: 12px;
   }
   
+  /* Medicine Table */
+  .medicine-table-container {
+    overflow-x: auto;
+    overflow-y: auto;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  .medicine-table-container::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+  
+  .medicine-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    font-size: 0.95rem;
+    table-layout: fixed;
+  }
+  
+  .medicine-table thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .medicine-table thead th {
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .medicine-table thead th:nth-child(1) {
+    width: 40%;
+  }
+  
+  .medicine-table thead th:nth-child(2) {
+    width: 30%;
+  }
+  
+  .medicine-table thead th:nth-child(3) {
+    width: 30%;
+  }
+  
+  .medicine-table thead th i {
+    margin-right: 6px;
+    font-size: 14px;
+  }
+  
+  .medicine-table tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: all 0.2s;
+  }
+  
+  .medicine-table tbody tr:nth-child(even) {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(118, 75, 162, 0.03) 100%);
+  }
+  
+  .medicine-table tbody tr:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+    transform: scale(1.01);
+  }
+  
+  .medicine-table tbody td {
+    padding: 15px;
+    color: #555;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  .medicine-name-cell {
+    font-weight: 600;
+    color: #333;
+  }
+  
+  .medicine-name-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .medicine-name-text::before {
+    content: "\f46b";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    color: #667eea;
+    font-size: 16px;
+  }
+  
+  .medicine-dosage-cell {
+    color: #667eea;
+    font-weight: 500;
+  }
+  
+  .medicine-duration-cell {
+    color: #666;
+  }
+  
   .medicine-item {
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
     padding: 15px;
@@ -434,23 +563,29 @@ function uploadPrescription(input) {
   }
   
   .back-link {
+    margin-top: 40px;
     text-align: center;
-    margin-top: 30px;
   }
   
   .back-link a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 30px;
+    background: white;
     color: #667eea;
+    border: 2px solid #667eea;
+    border-radius: 10px;
     text-decoration: none;
     font-weight: 600;
-    transition: color 0.3s;
+    transition: all 0.3s;
   }
   
   .back-link a:hover {
-    color: #764ba2;
-  }
-  
-  .back-link i {
-    margin-right: 5px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
   }
   
   @media (max-width: 768px) {
@@ -462,6 +597,41 @@ function uploadPrescription(input) {
     
     .prescription-date {
       align-self: flex-start;
+    }
+    
+    .medicine-table {
+      font-size: 0.85rem;
+    }
+    
+    .medicine-table thead th,
+    .medicine-table tbody td {
+      padding: 10px 8px;
+    }
+    
+    .medicine-name-text::before {
+      font-size: 14px;
+    }
+  }
+  
+  /* Print styles for prescriptions */
+  @media print {
+    .navbar, .footer, .back-link, .btn-upload, .btn-delete-small {
+      display: none;
+    }
+    
+    .prescription-card {
+      page-break-inside: avoid;
+      box-shadow: none;
+      border: 1px solid #ddd;
+    }
+    
+    .medicine-table {
+      page-break-inside: auto;
+    }
+    
+    .medicine-table tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
     }
   }
 </style>

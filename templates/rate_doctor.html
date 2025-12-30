@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}Rate Doctor - MediFriend{% endblock %}
+
+{% block content %}
+<div class="rate-container">
+  <div class="rate-header">
+    <i class="fas fa-star-half-alt"></i>
+    <h1>Rate Your Experience</h1>
+    <p>Share your feedback about the consultation</p>
+  </div>
+  
+  <div class="appointment-summary">
+    <h3><i class="fas fa-user-md"></i> Dr. {{ appointment.doctor_name }}</h3>
+    <p class="specialization">{{ appointment.specialization }}</p>
+    <div class="appointment-info">
+      <span><i class="fas fa-calendar"></i> {{ appointment.date }}</span>
+      <span><i class="fas fa-clock"></i> {{ appointment.time }}</span>
+    </div>
+  </div>
+  
+  <form method="POST" class="rating-form">
+    <div class="form-group">
+      <label for="rating">How would you rate this doctor? <span class="required">*</span></label>
+      <div class="star-rating" id="star-rating">
+        <input type="radio" name="rating" id="star5" value="5" required>
+        <label for="star5" title="Excellent">
+          <i class="fas fa-star"></i>
+        </label>
+        
+        <input type="radio" name="rating" id="star4" value="4">
+        <label for="star4" title="Very Good">
+          <i class="fas fa-star"></i>
+        </label>
+        
+        <input type="radio" name="rating" id="star3" value="3">
+        <label for="star3" title="Good">
+          <i class="fas fa-star"></i>
+        </label>
+        
+        <input type="radio" name="rating" id="star2" value="2">
+        <label for="star2" title="Fair">
+          <i class="fas fa-star"></i>
+        </label>
+        
+        <input type="radio" name="rating" id="star1" value="1">
+        <label for="star1" title="Poor">
+          <i class="fas fa-star"></i>
+        </label>
+      </div>
+      <p class="rating-text" id="rating-text">Select a rating</p>
+    </div>
+    
+    <div class="form-group">
+      <label for="review_text">Your Review (Optional)</label>
+      <textarea 
+        name="review_text" 
+        id="review_text" 
+        rows="5" 
+        placeholder="Share details about your experience with this doctor..."
+        maxlength="500"
+      ></textarea>
+      <small class="char-count"><span id="char-count">0</span>/500 characters</small>
+    </div>
+    
+    <div class="form-actions">
+      <a href="{{ url_for('patient.appointments') }}" class="btn-secondary">
+        <i class="fas fa-arrow-left"></i> Cancel
+      </a>
+      <button type="submit" class="btn-submit">
+        <i class="fas fa-paper-plane"></i> Submit Rating
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .rate-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .rate-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .rate-header i {
+    font-size: 60px;
+    color: #f39c12;
+    margin-bottom: 15px;
+  }
+  
+  .rate-header h1 {
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 8px;
+  }
+  
+  .rate-header p {
+    color: #666;
+    font-size: 1rem;
+  }
+  
+  .appointment-summary {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    margin-bottom: 30px;
+    text-align: center;
+  }
+  
+  .appointment-summary h3 {
+    font-size: 1.5rem;
+    color: #333;
+    margin-bottom: 5px;
+  }
+  
+  .appointment-summary h3 i {
+    color: #667eea;
+    margin-right: 8px;
+  }
+  
+  .specialization {
+    color: #764ba2;
+    font-weight: 600;
+    margin-bottom: 15px;
+  }
+  
+  .appointment-info {
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+    flex-wrap: wrap;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+  }
+  
+  .appointment-info span {
+    color: #666;
+    font-size: 0.95rem;
+  }
+  
+  .appointment-info i {
+    color: #667eea;
+    margin-right: 6px;
+  }
+  
+  .rating-form {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  
+  .form-group {
+    margin-bottom: 25px;
+  }
+  
+  .form-group label {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 12px;
+    font-size: 1rem;
+  }
+  
+  .required {
+    color: #e74c3c;
+  }
+  
+  /* Star Rating */
+  .star-rating {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: center;
+    gap: 5px;
+    font-size: 50px;
+    margin-bottom: 10px;
+  }
+  
+  .star-rating input[type="radio"] {
+    display: none;
+  }
+  
+  .star-rating label {
+    cursor: pointer;
+    color: #ddd;
+    transition: all 0.2s;
+  }
+  
+  .star-rating label:hover,
+  .star-rating label:hover ~ label {
+    color: #f39c12;
+    transform: scale(1.1);
+  }
+  
+  .star-rating input[type="radio"]:checked ~ label {
+    color: #f39c12;
+  }
+  
+  .rating-text {
+    text-align: center;
+    color: #667eea;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-top: 10px;
+  }
+  
+  textarea {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.95rem;
+    resize: vertical;
+    transition: border 0.3s;
+  }
+  
+  textarea:focus {
+    outline: none;
+    border-color: #667eea;
+  }
+  
+  .char-count {
+    display: block;
+    text-align: right;
+    color: #999;
+    margin-top: 5px;
+    font-size: 0.85rem;
+  }
+  
+  .form-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: space-between;
+    margin-top: 30px;
+  }
+  
+  .btn-secondary,
+  .btn-submit {
+    flex: 1;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 1rem;
+  }
+  
+  .btn-secondary {
+    background: #ecf0f1;
+    color: #555;
+  }
+  
+  .btn-secondary:hover {
+    background: #bdc3c7;
+  }
+  
+  .btn-submit {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+  }
+  
+  @media (max-width: 768px) {
+    .star-rating {
+      font-size: 40px;
+    }
+    
+    .form-actions {
+      flex-direction: column;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Update rating text on star selection
+  const ratingInputs = document.querySelectorAll('input[name="rating"]');
+  const ratingText = document.getElementById('rating-text');
+  const ratingLabels = {
+    '5': 'Excellent! ⭐⭐⭐⭐⭐',
+    '4': 'Very Good ⭐⭐⭐⭐',
+    '3': 'Good ⭐⭐⭐',
+    '2': 'Fair ⭐⭐',
+    '1': 'Poor ⭐'
+  };
+  
+  ratingInputs.forEach(input => {
+    input.addEventListener('change', function() {
+      ratingText.textContent = ratingLabels[this.value];
+    });
+  });
+  
+  // Character counter
+  const reviewText = document.getElementById('review_text');
+  const charCount = document.getElementById('char-count');
+  
+  reviewText.addEventListener('input', function() {
+    charCount.textContent = this.value.length;
+  });
+</script>
+{% endblock %}

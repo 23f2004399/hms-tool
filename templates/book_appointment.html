@@ -9,12 +9,24 @@
     <p>Schedule a visit with our doctors</p>
   </div>
   
+  <!-- Search Bar -->
+  <div class="search-container">
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" id="doctorSearch" placeholder="Search doctors by name or specialization..." autocomplete="off">
+      <button type="button" id="clearSearch" class="clear-search" style="display: none;">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="search-results" id="searchResults" style="display: none;"></div>
+  </div>
+  
   {% if doctors %}
-  <form method="POST" action="{{ url_for('patient.book_appointment') }}" class="appointment-form">
+  <form method="POST" action="{{ url_for('patient.book_appointment') }}" class="appointment-form" id="appointmentForm">
     <!-- Doctor Selection -->
     <div class="form-section">
       <h3><i class="fas fa-user-md"></i> Select Doctor</h3>
-      <div class="doctors-grid">
+      <div class="doctors-grid" id="doctorsGrid">
         {% for doctor in doctors %}
         <div class="doctor-card">
           <input type="radio" name="doctor_id" id="doctor_{{ doctor.id }}" value="{{ doctor.id }}" required>
@@ -24,6 +36,34 @@
             </div>
             <h4>Dr. {{ doctor.full_name }}</h4>
             <p class="specialization"><i class="fas fa-stethoscope"></i> {{ doctor.specialization }}</p>
+            <div class="rating-display">
+              {% if doctor.average_rating and doctor.average_rating > 0 %}
+                <div class="stars">
+                  {% set full_stars = (doctor.average_rating | round(0, 'floor')) | int %}
+                  {% set has_half = (doctor.average_rating - full_stars) >= 0.5 %}
+                  {% for i in range(full_stars) %}
+                    <i class="fas fa-star"></i>
+                  {% endfor %}
+                  {% if has_half %}
+                    <i class="fas fa-star-half-alt"></i>
+                  {% endif %}
+                  {% for i in range(5 - full_stars - (1 if has_half else 0)) %}
+                    <i class="far fa-star"></i>
+                  {% endfor %}
+                  <span class="rating-value">{{ "%.1f" | format(doctor.average_rating) }}</span>
+                </div>
+                <span class="rating-count">({{ doctor.total_ratings }} reviews)</span>
+              {% else %}
+                <div class="stars">
+                  <i class="far fa-star"></i>
+                  <i class="far fa-star"></i>
+                  <i class="far fa-star"></i>
+                  <i class="far fa-star"></i>
+                  <i class="far fa-star"></i>
+                </div>
+                <span class="rating-count">(No reviews yet)</span>
+              {% endif %}
+            </div>
             <p class="experience"><i class="fas fa-briefcase"></i> {{ doctor.experience_years }} years exp.</p>
             <p class="fee"><i class="fas fa-rupee-sign"></i> {{ doctor.consultation_fee }}</p>
           </label>
@@ -235,6 +275,43 @@
     color: #667eea !important;
   }
   
+  .rating-display {
+    color: #f39c12;
+    font-size: 0.9rem;
+    margin: 8px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .rating-display .stars {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  
+  .rating-display i {
+    color: #f39c12 !important;
+    margin: 0 1px;
+  }
+  
+  .rating-display .far {
+    color: #ddd !important;
+  }
+  
+  .rating-value {
+    color: #333;
+    font-weight: 600;
+    margin-left: 5px;
+  }
+  
+  .rating-count {
+    color: #999;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  
   /* Form Controls */
   .form-row {
     display: grid;
@@ -347,23 +424,176 @@
   }
   
   .back-link {
+    margin-top: 40px;
     text-align: center;
-    margin-top: 30px;
   }
   
   .back-link a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 30px;
+    background: white;
     color: #667eea;
+    border: 2px solid #667eea;
+    border-radius: 10px;
     text-decoration: none;
     font-weight: 600;
-    transition: color 0.3s;
+    transition: all 0.3s;
   }
   
   .back-link a:hover {
-    color: #764ba2;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
   }
   
-  .back-link i {
-    margin-right: 5px;
+  /* Search Styles */
+  .search-container {
+    margin-bottom: 30px;
+    position: relative;
+  }
+  
+  .search-box {
+    position: relative;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  .search-box i.fa-search {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #667eea;
+    font-size: 18px;
+  }
+  
+  .search-box input {
+    width: 100%;
+    padding: 15px 50px 15px 45px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.3s;
+    background: white;
+  }
+  
+  .search-box input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .clear-search {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 5px 10px;
+    transition: color 0.3s;
+  }
+  
+  .clear-search:hover {
+    color: #667eea;
+  }
+  
+  .search-results {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 600px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1000;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .search-results::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .search-result-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .search-result-item:last-child {
+    border-bottom: none;
+  }
+  
+  .search-result-item:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  }
+  
+  .search-result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+  
+  .search-result-name {
+    font-weight: 600;
+    color: #333;
+    font-size: 1rem;
+  }
+  
+  .search-result-rating {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.85rem;
+    color: #f39c12;
+  }
+  
+  .search-result-rating i {
+    font-size: 12px;
+  }
+  
+  .search-result-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    font-size: 0.9rem;
+    color: #666;
+  }
+  
+  .search-result-details span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  
+  .search-result-details i {
+    color: #667eea;
+    font-size: 13px;
+  }
+  
+  .search-empty {
+    padding: 30px;
+    text-align: center;
+    color: #999;
+  }
+  
+  .search-empty i {
+    font-size: 40px;
+    margin-bottom: 10px;
+    color: #ddd;
   }
   
   @media (max-width: 768px) {
@@ -381,4 +611,201 @@
     }
   }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Search functionality
+let searchTimeout;
+const searchInput = document.getElementById('doctorSearch');
+const clearBtn = document.getElementById('clearSearch');
+const searchResults = document.getElementById('searchResults');
+const doctorsGrid = document.getElementById('doctorsGrid');
+const originalDoctors = doctorsGrid.innerHTML; // Save original list
+
+// Handle search input
+searchInput.addEventListener('input', function() {
+  const query = this.value.trim();
+  
+  // Show/hide clear button
+  clearBtn.style.display = query ? 'block' : 'none';
+  
+  // Clear previous timeout
+  clearTimeout(searchTimeout);
+  
+  if (query.length < 1) {
+    searchResults.style.display = 'none';
+    doctorsGrid.innerHTML = originalDoctors; // Restore original list
+    return;
+  }
+  
+  // Debounce search - wait 300ms after user stops typing
+  searchTimeout = setTimeout(() => {
+    performSearch(query);
+  }, 300);
+});
+
+// Clear search
+clearBtn.addEventListener('click', function() {
+  searchInput.value = '';
+  clearBtn.style.display = 'none';
+  searchResults.style.display = 'none';
+  doctorsGrid.innerHTML = originalDoctors;
+  searchInput.focus();
+});
+
+// Close search results when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.search-container')) {
+    searchResults.style.display = 'none';
+  }
+});
+
+// Perform AJAX search
+async function performSearch(query) {
+  console.log('Searching for:', query);
+  try {
+    const response = await fetch(`/patient/api/search-doctors?q=${encodeURIComponent(query)}`);
+    const data = await response.json();
+    console.log('Search results:', data);
+    
+    if (data.success && data.doctors.length > 0) {
+      displaySearchResults(data.doctors);
+      updateDoctorsGrid(data.doctors);
+    } else {
+      showEmptyResults();
+      doctorsGrid.innerHTML = '<div class="search-empty"><i class="fas fa-user-md-slash"></i><p>No doctors found matching your search</p></div>';
+    }
+  } catch (error) {
+    console.error('Search error:', error);
+    searchResults.innerHTML = '<div class="search-empty"><p>Error performing search</p></div>';
+    searchResults.style.display = 'block';
+  }
+}
+
+// Display search results in dropdown
+function displaySearchResults(doctors) {
+  const resultsHTML = doctors.map(doc => {
+    const stars = generateStars(doc.average_rating);
+    const ratingText = doc.total_ratings > 0 
+      ? `<span class="search-result-rating">${stars} ${doc.average_rating.toFixed(1)} (${doc.total_ratings})</span>`
+      : '<span class="search-result-rating" style="color: #999;">No reviews yet</span>';
+    
+    return `
+      <div class="search-result-item" data-doctor-id="${doc.id}">
+        <div class="search-result-header">
+          <span class="search-result-name">Dr. ${doc.name}</span>
+          ${ratingText}
+        </div>
+        <div class="search-result-details">
+          <span><i class="fas fa-stethoscope"></i> ${doc.specialization}</span>
+          <span><i class="fas fa-graduation-cap"></i> ${doc.qualification}</span>
+          <span><i class="fas fa-clock"></i> ${doc.experience_years} years</span>
+          <span><i class="fas fa-rupee-sign"></i> ${doc.consultation_fee}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  searchResults.innerHTML = resultsHTML;
+  searchResults.style.display = 'block';
+  
+  // Add click handlers to select doctor
+  document.querySelectorAll('.search-result-item').forEach(item => {
+    item.addEventListener('click', function() {
+      const doctorId = this.dataset.doctorId;
+      const radioBtn = document.getElementById(`doctor_${doctorId}`);
+      if (radioBtn) {
+        radioBtn.checked = true;
+        radioBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      searchResults.style.display = 'none';
+    });
+  });
+}
+
+// Update main doctors grid with search results
+function updateDoctorsGrid(doctors) {
+  const gridHTML = doctors.map(doc => {
+    const stars = generateStarsHTML(doc.average_rating);
+    const ratingDisplay = doc.total_ratings > 0
+      ? `<div class="stars">${stars}<span class="rating-value">${doc.average_rating.toFixed(1)}</span></div>
+         <span class="rating-count">(${doc.total_ratings} reviews)</span>`
+      : `<div class="stars">
+           <i class="far fa-star"></i><i class="far fa-star"></i><i class="far fa-star"></i><i class="far fa-star"></i><i class="far fa-star"></i>
+         </div>
+         <span class="rating-count">(No Reviews Yet)</span>`;
+    
+    return `
+      <div class="doctor-card">
+        <input type="radio" name="doctor_id" id="doctor_${doc.id}" value="${doc.id}" required>
+        <label for="doctor_${doc.id}">
+          <div class="doctor-icon">
+            <i class="fas fa-user-md"></i>
+          </div>
+          <h4>Dr. ${doc.name}</h4>
+          <p class="specialization"><i class="fas fa-stethoscope"></i> ${doc.specialization}</p>
+          <div class="rating-display">${ratingDisplay}</div>
+          <div class="doctor-info">
+            <p><i class="fas fa-clock"></i> ${doc.experience_years} years experience</p>
+            <p><i class="fas fa-rupee-sign"></i> ₹${doc.consultation_fee}</p>
+            <p><i class="fas fa-graduation-cap"></i> ${doc.qualification}</p>
+          </div>
+        </label>
+      </div>
+    `;
+  }).join('');
+  
+  doctorsGrid.innerHTML = gridHTML;
+}
+
+// Generate stars for dropdown (inline)
+function generateStars(rating) {
+  const fullStars = Math.floor(rating);
+  const hasHalf = (rating - fullStars) >= 0.5;
+  let stars = '';
+  
+  for (let i = 0; i < fullStars; i++) {
+    stars += '<i class="fas fa-star"></i>';
+  }
+  if (hasHalf) {
+    stars += '<i class="fas fa-star-half-alt"></i>';
+  }
+  for (let i = fullStars + (hasHalf ? 1 : 0); i < 5; i++) {
+    stars += '<i class="far fa-star"></i>';
+  }
+  
+  return stars;
+}
+
+// Generate stars for grid (separate icons)
+function generateStarsHTML(rating) {
+  const fullStars = Math.floor(rating);
+  const hasHalf = (rating - fullStars) >= 0.5;
+  let html = '';
+  
+  for (let i = 0; i < fullStars; i++) {
+    html += '<i class="fas fa-star"></i>';
+  }
+  if (hasHalf) {
+    html += '<i class="fas fa-star-half-alt"></i>';
+  }
+  for (let i = fullStars + (hasHalf ? 1 : 0); i < 5; i++) {
+    html += '<i class="far fa-star"></i>';
+  }
+  
+  return html;
+}
+
+// Show empty results
+function showEmptyResults() {
+  searchResults.innerHTML = `
+    <div class="search-empty">
+      <i class="fas fa-search"></i>
+      <p>No doctors found</p>
+    </div>
+  `;
+  searchResults.style.display = 'block';
+}
+</script>
 {% endblock %}

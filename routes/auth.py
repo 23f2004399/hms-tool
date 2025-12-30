@@ -4,6 +4,7 @@ Handles user signup, login, and logout
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 from database import (
     get_user_by_email, 
     insert_user, 
@@ -23,7 +24,6 @@ def login_required(f):
     """
     Decorator to require login for routes
     """
-    from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -37,7 +37,6 @@ def role_required(role):
     """
     Decorator to require specific role for routes
     """
-    from functools import wraps
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):

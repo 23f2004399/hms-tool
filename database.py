@@ -3,6 +3,7 @@ Database Connection and Initialization for MediFriend
 """
 import sqlite3
 import os
+from datetime import date
 from models import ALL_MODELS
 
 
@@ -151,24 +152,26 @@ def insert_doctor_details(user_id, specialization, qualification=None, experienc
 
 def get_all_doctors():
     """
-    Get all doctors with their details
+    Get all doctors with their details including ratings
     """
     query = """
-        SELECT u.*, d.specialization, d.experience_years, d.consultation_fee
+        SELECT u.*, d.specialization, d.experience_years, d.consultation_fee,
+               d.average_rating, d.total_ratings
         FROM users u
         JOIN doctor_details d ON u.id = d.user_id
         WHERE u.role = 'DOCTOR'
-        ORDER BY u.full_name
+        ORDER BY d.average_rating DESC, u.full_name
     """
     return execute_query(query, fetchall=True)
 
 
 def get_doctor_details(doctor_id):
     """
-    Get doctor details by user ID
+    Get doctor details by user ID including ratings
     """
     query = """
-        SELECT u.*, d.specialization, d.qualification, d.experience_years, d.consultation_fee, d.schedule_json
+        SELECT u.*, d.specialization, d.qualification, d.experience_years, 
+               d.consultation_fee, d.schedule_json, d.average_rating, d.total_ratings
         FROM users u
         JOIN doctor_details d ON u.id = d.user_id
         WHERE u.id = ?
@@ -346,7 +349,6 @@ def get_doctor_stats(doctor_id):
     Get statistics for doctor dashboard
     Returns: pending appointments count, today's appointments count, total patients count
     """
-    from datetime import date
     today = date.today().strftime('%Y-%m-%d')
     
     # Get pending appointments count
@@ -636,6 +638,287 @@ def cleanup_old_notifications():
     return True
 
 
+# ========================================
+# 🌟 DOCTOR RATING FUNCTIONS
+# ========================================
+
+def create_rating(doctor_id, patient_id, appointment_id, rating, review_text=None):
+    """
+    Create a new rating for a doctor
+    
+    Args:
+        doctor_id: ID of the doctor being rated
+        patient_id: ID of the patient giving the rating
+        appointment_id: ID of the completed appointment
+        rating: Rating value (1-5)
+        review_text: Optional review text
+    
+    Returns:
+        Rating ID
+    """
+    query = """
+        INSERT INTO doctor_ratings (doctor_id, patient_id, appointment_id, rating, review_text)
+        VALUES (?, ?, ?, ?, ?)
+    """
+    rating_id = execute_query(query, (doctor_id, patient_id, appointment_id, rating, review_text), commit=True)
+    
+    # Update doctor's average rating
+    update_doctor_average_rating(doctor_id)
+    
+    return rating_id
+
+
+def update_doctor_average_rating(doctor_id):
+    """
+    Recalculate and update doctor's average rating
+    
+    Args:
+        doctor_id: ID of the doctor
+    """
+    # Calculate average
+    query = """
+        SELECT AVG(rating) as avg_rating, COUNT(*) as total_ratings
+        FROM doctor_ratings
+        WHERE doctor_id = ?
+    """
+    result = execute_query(query, (doctor_id,), fetchone=True)
+    
+    avg_rating = result['avg_rating'] if result['avg_rating'] else 0.0
+    total_ratings = result['total_ratings'] if result['total_ratings'] else 0
+    
+    # Update doctor_details
+    update_query = """
+        UPDATE doctor_details
+        SET average_rating = ?, total_ratings = ?
+        WHERE user_id = ?
+    """
+    execute_query(update_query, (avg_rating, total_ratings, doctor_id), commit=True)
+
+
+def get_doctor_ratings(doctor_id, limit=10):
+    """
+    Get all ratings for a doctor with patient info
+    
+    Args:
+        doctor_id: ID of the doctor
+        limit: Maximum number of ratings to return
+    
+    Returns:
+        List of rating dictionaries
+    """
+    query = """
+        SELECT 
+            dr.id,
+            dr.rating,
+            dr.review_text,
+            dr.created_at,
+            u.full_name as patient_name
+        FROM doctor_ratings dr
+        JOIN users u ON dr.patient_id = u.id
+        WHERE dr.doctor_id = ?
+        ORDER BY dr.created_at DESC
+        LIMIT ?
+    """
+    return execute_query(query, (doctor_id, limit), fetchall=True)
+
+
+def check_existing_rating(patient_id, appointment_id):
+    """
+    Check if patient already rated this appointment
+    
+    Args:
+        patient_id: ID of the patient
+        appointment_id: ID of the appointment
+    
+    Returns:
+        Rating dict if exists, None otherwise
+    """
+    query = """
+        SELECT * FROM doctor_ratings
+        WHERE patient_id = ? AND appointment_id = ?
+    """
+    return execute_query(query, (patient_id, appointment_id), fetchone=True)
+
+
+def get_doctor_average_rating(doctor_id):
+    """
+    Get doctor's average rating and total count
+    
+    Args:
+        doctor_id: ID of the doctor
+    
+    Returns:
+        Dict with average_rating and total_ratings
+    """
+    query = """
+        SELECT average_rating, total_ratings
+        FROM doctor_details
+        WHERE user_id = ?
+    """
+    result = execute_query(query, (doctor_id,), fetchone=True)
+    
+    if result:
+        return {
+            'average_rating': result['average_rating'] or 0.0,
+            'total_ratings': result['total_ratings'] or 0
+        }
+    return {'average_rating': 0.0, 'total_ratings': 0}
+
+
+# ============================================================================
+# SEARCH FUNCTIONS
+# ============================================================================
+
+def search_doctors(query):
+    """
+    Search doctors by name, specialization, or qualification
+    Returns list of doctors matching the search query
+    """
+    search_pattern = f"%{query}%"
+    sql = """
+        SELECT u.*, d.specialization, d.qualification, d.experience_years, d.consultation_fee,
+               d.average_rating, d.total_ratings
+        FROM users u
+        JOIN doctor_details d ON u.id = d.user_id
+        WHERE u.role = 'DOCTOR'
+        AND (
+            u.full_name LIKE ? COLLATE NOCASE
+            OR d.specialization LIKE ? COLLATE NOCASE
+            OR d.qualification LIKE ? COLLATE NOCASE
+        )
+        ORDER BY d.average_rating DESC, u.full_name
+        LIMIT 20
+    """
+    return execute_query(sql, (search_pattern, search_pattern, search_pattern), fetchall=True)
+
+
+def search_patients(query, doctor_id=None):
+    """
+    Search patients by name, email, or phone
+    Optionally filter by doctor's patients only
+    """
+    search_pattern = f"%{query}%"
+    
+    if doctor_id:
+        # Search only patients who have appointments with this doctor
+        sql = """
+            SELECT DISTINCT u.*, p.blood_group
+            FROM users u
+            LEFT JOIN patient_details p ON u.id = p.user_id
+            INNER JOIN appointments a ON u.id = a.patient_id
+            WHERE u.role = 'PATIENT'
+            AND a.doctor_id = ?
+            AND (
+                u.full_name LIKE ? COLLATE NOCASE
+                OR u.email LIKE ? COLLATE NOCASE
+                OR u.phone LIKE ? COLLATE NOCASE
+            )
+            ORDER BY u.full_name
+            LIMIT 20
+        """
+        return execute_query(sql, (doctor_id, search_pattern, search_pattern, search_pattern), fetchall=True)
+    else:
+        # Search all patients (admin functionality)
+        sql = """
+            SELECT u.*, p.blood_group
+            FROM users u
+            LEFT JOIN patient_details p ON u.id = p.user_id
+            WHERE u.role = 'PATIENT'
+            AND (
+                u.full_name LIKE ? COLLATE NOCASE
+                OR u.email LIKE ? COLLATE NOCASE
+                OR u.phone LIKE ? COLLATE NOCASE
+            )
+            ORDER BY u.full_name
+            LIMIT 20
+        """
+        return execute_query(sql, (search_pattern, search_pattern, search_pattern), fetchall=True)
+
+
+# ============================================================================
+# LAB REPORT FUNCTIONS
+# ============================================================================
+
+def create_lab_report(patient_id, test_type, test_date, report_image, extracted_values_json, notes=None):
+    """
+    Create a new lab report entry
+    """
+    query = """
+        INSERT INTO lab_reports 
+        (patient_id, test_type, test_date, report_image, extracted_values_json, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """
+    return execute_query(query, 
+                        (patient_id, test_type, test_date, report_image, extracted_values_json, notes), 
+                        commit=True)
+
+
+def get_patient_lab_reports(patient_id, test_type=None):
+    """
+    Get all lab reports for a patient, optionally filtered by test type
+    Ordered by test_date descending (newest first)
+    """
+    if test_type:
+        query = """
+            SELECT * FROM lab_reports
+            WHERE patient_id = ? AND test_type = ?
+            ORDER BY test_date DESC, uploaded_at DESC
+        """
+        return execute_query(query, (patient_id, test_type), fetchall=True)
+    else:
+        query = """
+            SELECT * FROM lab_reports
+            WHERE patient_id = ?
+            ORDER BY test_date DESC, uploaded_at DESC
+        """
+        return execute_query(query, (patient_id,), fetchall=True)
+
+
+def get_lab_report_by_id(report_id):
+    """
+    Get a specific lab report by ID
+    """
+    query = "SELECT * FROM lab_reports WHERE id = ?"
+    return execute_query(query, (report_id,), fetchone=True)
+
+
+def delete_lab_report(report_id):
+    """
+    Delete a lab report
+    """
+    query = "DELETE FROM lab_reports WHERE id = ?"
+    return execute_query(query, (report_id,), commit=True)
+
+
+def get_lab_report_trends(patient_id, test_type, parameter_name, limit=10):
+    """
+    Get trend data for a specific health parameter over time
+    Returns list of {test_date, value} for charting
+    """
+    query = """
+        SELECT test_date, extracted_values_json
+        FROM lab_reports
+        WHERE patient_id = ? AND test_type = ?
+        ORDER BY test_date ASC
+        LIMIT ?
+    """
+    reports = execute_query(query, (patient_id, test_type, limit), fetchall=True)
+    
+    trends = []
+    for report in reports:
+        if report['extracted_values_json']:
+            import json
+            values = json.loads(report['extracted_values_json'])
+            if parameter_name in values:
+                trends.append({
+                    'date': report['test_date'],
+                    'value': values[parameter_name]
+                })
+    
+    return trends
+
+
 # Run initialization if executed directly
 if __name__ == "__main__":
     init_db()
+

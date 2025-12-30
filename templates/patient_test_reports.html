@@ -1,0 +1,631 @@
+{% extends "base.html" %}
+
+{% block title %}My Test Reports - MediFriend{% endblock %}
+
+{% block content %}
+<div class="page-container">
+  <div class="page-header">
+    <h1><i class="fas fa-file-medical"></i> My Test Reports</h1>
+    <p>Track your health metrics over time</p>
+    <a href="{{ url_for('patient.upload_test_report') }}" class="btn-upload">
+      <i class="fas fa-plus"></i> Upload New Report
+    </a>
+  </div>
+  
+  {% if reports %}
+  <!-- Filter by Test Type -->
+  <div class="filter-section">
+    <label><i class="fas fa-filter"></i> Filter by Test Type:</label>
+    <div class="filter-buttons">
+      <button class="filter-btn active" data-type="all">
+        All Reports <span class="count">{{ reports|length }}</span>
+      </button>
+      {% for test_type, type_reports in reports_by_type.items() %}
+      <button class="filter-btn" data-type="{{ test_type }}">
+        {{ test_type }} <span class="count">{{ type_reports|length }}</span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  
+  <!-- Timeline View -->
+  <div class="timeline-container">
+    {% for report in reports %}
+    <div class="timeline-item" data-type="{{ report.test_type }}">
+      <div class="timeline-date">
+        <div class="date-badge">
+          <span class="day">{{ report.test_date[8:10] }}</span>
+          <span class="month">{{ report.test_date[5:7] }}/{{ report.test_date[0:4] }}</span>
+        </div>
+      </div>
+      
+      <div class="timeline-content">
+        <div class="report-card">
+          <div class="report-header">
+            <div class="report-title">
+              <i class="fas fa-flask"></i>
+              <h3>{{ report.test_type }}</h3>
+            </div>
+            <div class="report-actions">
+              <button class="btn-view-image" onclick="viewImage('{{ report.report_image }}')">
+                <i class="fas fa-image"></i>
+              </button>
+              <form method="POST" action="{{ url_for('patient.delete_test_report', report_id=report.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this test report?')">
+                <button type="submit" class="btn-delete">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+          
+          {% if report.extracted_values_json %}
+          {% set values = report.extracted_values_json|from_json %}
+          <div class="extracted-values">
+            <h4><i class="fas fa-chart-line"></i> Extracted Values</h4>
+            <div class="values-grid">
+              {% for key, value in values.items() %}
+              <div class="value-item">
+                <span class="value-label">{{ key.replace('_', ' ') }}</span>
+                <span class="value-number">{{ value }}</span>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% else %}
+          <div class="no-values">
+            <i class="fas fa-exclamation-circle"></i>
+            <p>No values could be extracted from this report</p>
+          </div>
+          {% endif %}
+          
+          {% if report.notes %}
+          <div class="report-notes">
+            <i class="fas fa-sticky-note"></i>
+            <p>{{ report.notes }}</p>
+          </div>
+          {% endif %}
+          
+          <div class="report-footer">
+            <span class="uploaded-time">
+              <i class="fas fa-clock"></i>
+              Uploaded {{ report.uploaded_at[:10] }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  
+  {% else %}
+  <!-- Empty State -->
+  <div class="empty-state">
+    <i class="fas fa-file-medical"></i>
+    <h3>No Test Reports Yet</h3>
+    <p>Upload your lab test reports to start tracking your health metrics</p>
+  </div>
+  {% endif %}
+  
+  <div class="back-link">
+    <a href="{{ url_for('patient.dashboard') }}">
+      <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+  </div>
+</div>
+
+<!-- Image Modal -->
+<div id="imageModal" class="modal">
+  <span class="modal-close" onclick="closeModal()">&times;</span>
+  <img class="modal-content" id="modalImage">
+</div>
+
+<style>
+  .page-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px 20px;
+  }
+  
+  .page-header {
+    text-align: center;
+    margin-bottom: 40px;
+    position: relative;
+  }
+  
+  .page-header h1 {
+    font-size: 2.2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+  }
+  
+  .page-header h1 i {
+    -webkit-text-fill-color: #667eea;
+  }
+  
+  .page-header p {
+    color: #666;
+    font-size: 1.05rem;
+    margin-bottom: 20px;
+  }
+  
+  .btn-upload {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 30px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  
+  .btn-upload:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  }
+  
+  .filter-section {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    margin-bottom: 30px;
+  }
+  
+  .filter-section label {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 15px;
+    display: block;
+  }
+  
+  .filter-section label i {
+    color: #667eea;
+    margin-right: 8px;
+  }
+  
+  .filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .filter-btn {
+    padding: 10px 20px;
+    border: 2px solid #e0e0e0;
+    background: white;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .filter-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+  }
+  
+  .filter-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+  }
+  
+  .filter-btn .count {
+    background: rgba(255,255,255,0.3);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+  }
+  
+  .filter-btn.active .count {
+    background: rgba(255,255,255,0.3);
+  }
+  
+  .timeline-container {
+    position: relative;
+    padding-left: 40px;
+  }
+  
+  .timeline-container::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .timeline-item {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 30px;
+    position: relative;
+  }
+  
+  .timeline-date {
+    position: absolute;
+    left: -30px;
+    top: 0;
+  }
+  
+  .date-badge {
+    background: white;
+    border: 3px solid #667eea;
+    border-radius: 12px;
+    width: 80px;
+    padding: 10px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+  
+  .date-badge .day {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #667eea;
+  }
+  
+  .date-badge .month {
+    display: block;
+    font-size: 0.75rem;
+    color: #666;
+    text-transform: uppercase;
+  }
+  
+  .timeline-content {
+    flex: 1;
+    margin-left: 70px;
+  }
+  
+  .report-card {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    transition: all 0.3s;
+  }
+  
+  .report-card:hover {
+    box-shadow: 0 6px 25px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+  }
+  
+  .report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
+  }
+  
+  .report-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .report-title i {
+    font-size: 1.5rem;
+    color: #667eea;
+  }
+  
+  .report-title h3 {
+    margin: 0;
+    color: #333;
+    font-size: 1.3rem;
+  }
+  
+  .report-actions {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .btn-view-image,
+  .btn-delete {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .btn-view-image {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .btn-view-image:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  }
+  
+  .btn-delete {
+    background: #ff4444;
+    color: white;
+  }
+  
+  .btn-delete:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(255, 68, 68, 0.3);
+  }
+  
+  .extracted-values h4 {
+    color: #333;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+  }
+  
+  .extracted-values h4 i {
+    color: #667eea;
+    margin-right: 8px;
+  }
+  
+  .values-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+  }
+  
+  .value-item {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    padding: 15px;
+    border-radius: 10px;
+    border-left: 3px solid #667eea;
+  }
+  
+  .value-label {
+    display: block;
+    font-size: 0.85rem;
+    color: #666;
+    text-transform: capitalize;
+    margin-bottom: 5px;
+  }
+  
+  .value-number {
+    display: block;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #667eea;
+  }
+  
+  .no-values {
+    text-align: center;
+    padding: 30px;
+    color: #999;
+  }
+  
+  .no-values i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    color: #ddd;
+  }
+  
+  .report-notes {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 10px;
+    display: flex;
+    gap: 10px;
+  }
+  
+  .report-notes i {
+    color: #667eea;
+    flex-shrink: 0;
+  }
+  
+  .report-notes p {
+    margin: 0;
+    color: #666;
+  }
+  
+  .report-footer {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #f0f0f0;
+  }
+  
+  .uploaded-time {
+    color: #999;
+    font-size: 0.9rem;
+  }
+  
+  .uploaded-time i {
+    margin-right: 5px;
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 80px 40px;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  }
+  
+  .empty-state i {
+    font-size: 5rem;
+    color: #667eea;
+    margin-bottom: 20px;
+  }
+  
+  .empty-state h3 {
+    font-size: 1.8rem;
+    color: #333;
+    margin-bottom: 15px;
+  }
+  
+  .empty-state p {
+    color: #666;
+    font-size: 1.05rem;
+    margin-bottom: 30px;
+  }
+  
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 30px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  }
+  
+  /* Back Link */
+  .back-link {
+    margin-top: 40px;
+    text-align: center;
+  }
+  
+  .back-link a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 30px;
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  
+  .back-link a:hover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  }
+  
+  /* Image Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .modal-content {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+  }
+  
+  .modal-close {
+    position: absolute;
+    top: 20px;
+    right: 40px;
+    color: white;
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  
+  .modal-close:hover {
+    color: #667eea;
+  }
+  
+  @media (max-width: 768px) {
+    .timeline-container {
+      padding-left: 20px;
+    }
+    
+    .timeline-container::before {
+      left: 10px;
+    }
+    
+    .timeline-date {
+      left: -20px;
+    }
+    
+    .date-badge {
+      width: 60px;
+      padding: 8px;
+    }
+    
+    .timeline-content {
+      margin-left: 50px;
+    }
+    
+    .values-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .filter-buttons {
+      flex-direction: column;
+    }
+  }
+</style>
+
+<script>
+  // Filter functionality
+  const filterButtons = document.querySelectorAll('.filter-btn');
+  const timelineItems = document.querySelectorAll('.timeline-item');
+  
+  filterButtons.forEach(btn => {
+    btn.addEventListener('click', function() {
+      const type = this.dataset.type;
+      
+      // Update active button
+      filterButtons.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Filter items
+      timelineItems.forEach(item => {
+        if (type === 'all' || item.dataset.type === type) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+  });
+  
+  // Image modal
+  function viewImage(filename) {
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    modal.style.display = 'flex';
+    modalImg.src = '/static/uploads/' + filename;
+  }
+  
+  function closeModal() {
+    document.getElementById('imageModal').style.display = 'none';
+  }
+  
+  // Close modal on outside click
+  document.getElementById('imageModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeModal();
+    }
+  });
+</script>
+{% endblock %}

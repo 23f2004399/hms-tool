@@ -80,6 +80,8 @@ class DoctorDetails:
             experience_years INTEGER DEFAULT 0,
             consultation_fee REAL DEFAULT 0.0,
             schedule_json TEXT,
+            average_rating REAL DEFAULT 0.0,
+            total_ratings INTEGER DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
@@ -222,6 +224,70 @@ class Notification:
         ]
 
 
+class DoctorRating:
+    """
+    Ratings and reviews for doctors by patients
+    """
+    TABLE_NAME = "doctor_ratings"
+    
+    @staticmethod
+    def create_table_sql():
+        return """
+        CREATE TABLE IF NOT EXISTS doctor_ratings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doctor_id INTEGER NOT NULL,
+            patient_id INTEGER NOT NULL,
+            appointment_id INTEGER,
+            rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+            review_text TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (doctor_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL,
+            UNIQUE(patient_id, appointment_id)
+        )
+        """
+    
+    @staticmethod
+    def create_indexes_sql():
+        return [
+            "CREATE INDEX IF NOT EXISTS idx_rating_doctor ON doctor_ratings(doctor_id)",
+            "CREATE INDEX IF NOT EXISTS idx_rating_patient ON doctor_ratings(patient_id)",
+            "CREATE INDEX IF NOT EXISTS idx_rating_created ON doctor_ratings(created_at)"
+        ]
+
+
+class LabReport:
+    """
+    Stores patient lab test reports with AI-extracted values
+    """
+    TABLE_NAME = "lab_reports"
+    
+    @staticmethod
+    def create_table_sql():
+        return """
+        CREATE TABLE IF NOT EXISTS lab_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL,
+            test_type TEXT NOT NULL,
+            test_date TEXT NOT NULL,
+            report_image TEXT NOT NULL,
+            extracted_values_json TEXT,
+            notes TEXT,
+            uploaded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    
+    @staticmethod
+    def create_indexes_sql():
+        return [
+            "CREATE INDEX IF NOT EXISTS idx_lab_patient ON lab_reports(patient_id)",
+            "CREATE INDEX IF NOT EXISTS idx_lab_test_date ON lab_reports(test_date)",
+            "CREATE INDEX IF NOT EXISTS idx_lab_test_type ON lab_reports(test_type)"
+        ]
+
+
 # List of all model classes for easy iteration
 ALL_MODELS = [
     User,
@@ -230,5 +296,7 @@ ALL_MODELS = [
     Appointment,
     Prescription,
     Upload,
-    Notification
+    Notification,
+    DoctorRating,
+    LabReport
 ]

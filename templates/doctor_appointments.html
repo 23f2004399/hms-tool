@@ -376,23 +376,29 @@
   }
   
   .back-link {
+    margin-top: 40px;
     text-align: center;
-    margin-top: 30px;
   }
   
   .back-link a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 30px;
+    background: white;
     color: #667eea;
+    border: 2px solid #667eea;
+    border-radius: 10px;
     text-decoration: none;
     font-weight: 600;
-    transition: color 0.3s;
+    transition: all 0.3s;
   }
   
   .back-link a:hover {
-    color: #764ba2;
-  }
-  
-  .back-link i {
-    margin-right: 5px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
   }
   
   @media (max-width: 768px) {

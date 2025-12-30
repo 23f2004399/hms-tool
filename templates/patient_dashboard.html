@@ -36,6 +36,14 @@
     </div>
     
     <div class="dashboard-card action-card">
+      <a href="{{ url_for('patient.test_reports') }}" class="action-link">
+        <i class="fas fa-file-medical"></i>
+        <h3>Test Reports</h3>
+        <p>Track your health metrics</p>
+      </a>
+    </div>
+    
+    <div class="dashboard-card action-card">
       <a href="{{ url_for('auth.profile') }}" class="action-link">
         <i class="fas fa-user-circle"></i>
         <h3>My Profile</h3>
