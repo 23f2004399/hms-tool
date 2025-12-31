@@ -1,0 +1,549 @@
+{% extends "base.html" %}
+
+{% block title %}Find Doctors - MediFriend{% endblock %}
+
+{% block content %}
+<div class="map-container">
+  <div class="map-header">
+    <h1><i class="fas fa-map-marked-alt"></i> Find Doctors Near You</h1>
+    <p>Discover healthcare professionals in your area</p>
+  </div>
+  
+  <div class="map-controls">
+    <div class="search-group">
+      <label for="searchBox">
+        <i class="fas fa-search"></i> Search Doctors
+      </label>
+      <input type="text" id="searchBox" class="form-control" 
+             placeholder="Search by name, specialization, qualification, or location...">
+    </div>
+    
+    <div class="filter-group">
+      <label for="specializationFilter">
+        <i class="fas fa-filter"></i> Filter by Specialization
+      </label>
+      <select id="specializationFilter" class="form-control">
+        <option value="">All Specializations</option>
+        {% for spec in specializations %}
+        <option value="{{ spec }}">{{ spec }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    
+    <div class="info-group">
+      <span class="doctor-count">
+        <i class="fas fa-user-md"></i> 
+        <span id="visibleCount">{{ doctors|length }}</span> doctors found
+      </span>
+      <button id="locateMe" class="btn-locate">
+        <i class="fas fa-crosshairs"></i> My Location
+      </button>
+    </div>
+  </div>
+  
+  <div id="map"></div>
+  
+  <div class="map-legend">
+    <div class="legend-item">
+      <i class="fas fa-map-marker-alt" style="color: #667eea;"></i>
+      <span>Doctor Clinic</span>
+    </div>
+    <div class="legend-item">
+      <i class="fas fa-user-circle" style="color: #10b981;"></i>
+      <span>Your Location</span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<style>
+  .map-container {
+    max-width: 100%;
+    padding: 20px;
+    min-height: calc(100vh - 100px);
+  }
+  
+  .map-header {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  
+  .map-header h1 {
+    color: #333;
+    margin-bottom: 10px;
+  }
+  
+  .map-header h1 i {
+    color: #667eea;
+    margin-right: 10px;
+  }
+  
+  .map-header p {
+    color: #666;
+    font-size: 1.1rem;
+  }
+  
+  .map-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 20px;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  
+  .search-group {
+    flex: 2;
+    min-width: 300px;
+  }
+  
+  .search-group label {
+    display: block;
+    color: #4a5568;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  
+  .search-group label i {
+    color: #667eea;
+    margin-right: 8px;
+  }
+  
+  .filter-group {
+    flex: 1;
+    min-width: 250px;
+  }
+  
+  .filter-group label {
+    display: block;
+    color: #4a5568;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  
+  .filter-group label i {
+    color: #667eea;
+    margin-right: 8px;
+  }
+  
+  .form-control {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s;
+  }
+  
+  .form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .info-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  
+  .doctor-count {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #4a5568;
+    font-weight: 600;
+    padding: 10px 15px;
+    background: #f7fafc;
+    border-radius: 8px;
+  }
+  
+  .doctor-count i {
+    color: #667eea;
+  }
+  
+  .btn-locate {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  
+  .btn-locate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+  }
+  
+  #map {
+    width: 100%;
+    height: 600px;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    border: 2px solid #e2e8f0;
+  }
+  
+  .map-legend {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-top: 20px;
+    padding: 15px;
+    background: #f7fafc;
+    border-radius: 10px;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #4a5568;
+    font-weight: 500;
+  }
+  
+  .legend-item i {
+    font-size: 1.2rem;
+  }
+  
+  /* Custom Leaflet Popup Styling */
+  .leaflet-popup-content-wrapper {
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+  
+  .leaflet-popup-content {
+    margin: 15px;
+    min-width: 250px;
+  }
+  
+  .doctor-popup {
+    text-align: center;
+  }
+  
+  .doctor-popup h3 {
+    color: #667eea;
+    margin-bottom: 8px;
+    font-size: 1.2rem;
+  }
+  
+  .doctor-popup .specialization {
+    color: #4a5568;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  
+  .doctor-popup .detail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #666;
+    margin: 5px 0;
+    font-size: 0.9rem;
+  }
+  
+  .doctor-popup .rating {
+    color: #f59e0b;
+    font-weight: 600;
+  }
+  
+  .doctor-popup .address {
+    color: #718096;
+    font-size: 0.85rem;
+    margin: 10px 0;
+    padding: 8px;
+    background: #f7fafc;
+    border-radius: 6px;
+  }
+  
+  .doctor-popup .btn-book {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  
+  .doctor-popup .btn-book:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  }
+  
+  @media (max-width: 768px) {
+    .map-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .search-group,
+    .filter-group {
+      min-width: 100%;
+    }
+    
+    .info-group {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .btn-locate {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    #map {
+      height: 500px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// Doctor data from backend
+const doctors = {{ doctors | tojson }};
+
+// Initialize map centered on India
+const map = L.map('map').setView([20.5937, 78.9629], 5);
+
+// Add OpenStreetMap tiles
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19
+}).addTo(map);
+
+// Store markers for filtering
+let markers = [];
+let userMarker = null;
+let userLocation = null;
+
+// Custom icon for doctors
+const doctorIcon = L.divIcon({
+  html: '<i class="fas fa-map-marker-alt" style="color: #667eea; font-size: 2rem;"></i>',
+  className: 'custom-marker',
+  iconSize: [30, 42],
+  iconAnchor: [15, 42],
+  popupAnchor: [0, -42]
+});
+
+// Custom icon for user
+const userIcon = L.divIcon({
+  html: '<i class="fas fa-user-circle" style="color: #10b981; font-size: 2rem;"></i>',
+  className: 'custom-marker',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15]
+});
+
+// Calculate distance between two points (Haversine formula)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Create popup content for doctor
+function createPopupContent(doctor, distance = null) {
+  let distanceHtml = '';
+  if (distance !== null) {
+    distanceHtml = `
+      <div class="detail">
+        <i class="fas fa-route"></i>
+        <span>${distance.toFixed(1)} km away</span>
+      </div>
+    `;
+  }
+  
+  const rating = doctor.average_rating > 0 
+    ? `<div class="detail rating">
+         <i class="fas fa-star"></i>
+         ${doctor.average_rating.toFixed(1)} (${doctor.total_ratings} reviews)
+       </div>`
+    : '<div class="detail"><i class="fas fa-star"></i> No ratings yet</div>';
+  
+  return `
+    <div class="doctor-popup">
+      <h3>Dr. ${doctor.full_name}</h3>
+      <div class="specialization">
+        <i class="fas fa-stethoscope"></i>
+        ${doctor.specialization}
+      </div>
+      ${rating}
+      <div class="detail">
+        <i class="fas fa-briefcase"></i>
+        ${doctor.experience_years} years experience
+      </div>
+      <div class="detail">
+        <i class="fas fa-rupee-sign"></i>
+        ₹${doctor.consultation_fee} consultation fee
+      </div>
+      ${distanceHtml}
+      <div class="address">
+        <i class="fas fa-map-marker-alt"></i> ${doctor.clinic_address || 'Address not available'}
+      </div>
+      <a href="/patient/book-appointment?doctor_id=${doctor.id}" class="btn-book">
+        <i class="fas fa-calendar-plus"></i> Book Appointment
+      </a>
+    </div>
+  `;
+}
+
+// Add markers for all doctors
+function addDoctorMarkers(filteredDoctors = doctors, shouldFocus = false) {
+  // Remove existing markers
+  markers.forEach(marker => map.removeLayer(marker));
+  markers = [];
+  
+  // Add new markers
+  filteredDoctors.forEach(doctor => {
+    if (doctor.latitude && doctor.longitude) {
+      let distance = null;
+      if (userLocation) {
+        distance = calculateDistance(
+          userLocation.lat, userLocation.lng,
+          doctor.latitude, doctor.longitude
+        );
+      }
+      
+      const marker = L.marker([doctor.latitude, doctor.longitude], { icon: doctorIcon })
+        .addTo(map)
+        .bindPopup(createPopupContent(doctor, distance));
+      
+      markers.push(marker);
+    }
+  });
+  
+  // Update count
+  document.getElementById('visibleCount').textContent = filteredDoctors.length;
+  
+  // Auto-focus on filtered results
+  if (markers.length > 0 && shouldFocus) {
+    if (markers.length === 1) {
+      // If only one result, center on it and zoom in
+      const marker = markers[0];
+      map.flyTo(marker.getLatLng(), 13, {
+        duration: 1.5,
+        easeLinearity: 0.5
+      });
+      // Open popup for single result
+      setTimeout(() => marker.openPopup(), 1500);
+    } else {
+      // If multiple results, fit bounds to show all
+      const group = new L.featureGroup(markers);
+      map.flyToBounds(group.getBounds().pad(0.1), {
+        duration: 1.5,
+        easeLinearity: 0.5
+      });
+    }
+  } else if (markers.length > 0 && !userLocation) {
+    // Initial load - fit all markers
+    const group = new L.featureGroup(markers);
+    map.fitBounds(group.getBounds().pad(0.1));
+  }
+}
+
+// Apply all filters (search + specialization)
+function applyFilters() {
+  const searchTerm = document.getElementById('searchBox').value.toLowerCase().trim();
+  const specialization = document.getElementById('specializationFilter').value;
+  
+  let filtered = doctors;
+  
+  // Filter by specialization
+  if (specialization !== '') {
+    filtered = filtered.filter(d => d.specialization === specialization);
+  }
+  
+  // Filter by search term (name, specialization, qualification, or location)
+  if (searchTerm !== '') {
+    filtered = filtered.filter(d => {
+      return (
+        (d.full_name && d.full_name.toLowerCase().includes(searchTerm)) ||
+        (d.specialization && d.specialization.toLowerCase().includes(searchTerm)) ||
+        (d.qualification && d.qualification.toLowerCase().includes(searchTerm)) ||
+        (d.clinic_address && d.clinic_address.toLowerCase().includes(searchTerm))
+      );
+    });
+  }
+  
+  // Pass shouldFocus=true to auto-center on filtered results
+  addDoctorMarkers(filtered, true);
+}
+
+// Search box with debounce
+let searchTimeout;
+document.getElementById('searchBox').addEventListener('input', () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(applyFilters, 300);
+});
+
+// Filter doctors by specialization
+document.getElementById('specializationFilter').addEventListener('change', applyFilters);
+
+// Get user's current location
+document.getElementById('locateMe').addEventListener('click', () => {
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        userLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        
+        // Remove old user marker
+        if (userMarker) {
+          map.removeLayer(userMarker);
+        }
+        
+        // Add user marker
+        userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+          .addTo(map)
+          .bindPopup('<b>You are here</b>')
+          .openPopup();
+        
+        // Center map on user with smooth animation
+        map.flyTo([userLocation.lat, userLocation.lng], 13, {
+          duration: 1.5,
+          easeLinearity: 0.5
+        });
+        
+        // Update all doctor popups with distances (apply current filters)
+        applyFilters();
+      },
+      (error) => {
+        alert('Could not get your location. Please enable location services.');
+      }
+    );
+  } else {
+    alert('Geolocation is not supported by your browser.');
+  }
+});
+
+// Initial marker display
+addDoctorMarkers();
+</script>
+{% endblock %}

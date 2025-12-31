@@ -82,6 +82,9 @@ class DoctorDetails:
             schedule_json TEXT,
             average_rating REAL DEFAULT 0.0,
             total_ratings INTEGER DEFAULT 0,
+            clinic_address TEXT,
+            latitude REAL,
+            longitude REAL,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
@@ -111,9 +114,13 @@ class Appointment:
             time TEXT NOT NULL,
             symptoms TEXT,
             status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'CONFIRMED', 'REJECTED', 'COMPLETED')),
+            follow_up_required INTEGER DEFAULT 0,
+            follow_up_date TEXT,
+            parent_appointment_id INTEGER,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (doctor_id) REFERENCES users(id) ON DELETE CASCADE
+            FOREIGN KEY (doctor_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (parent_appointment_id) REFERENCES appointments(id) ON DELETE SET NULL
         )
         """
     
@@ -123,7 +130,8 @@ class Appointment:
             "CREATE INDEX IF NOT EXISTS idx_appointment_patient ON appointments(patient_id)",
             "CREATE INDEX IF NOT EXISTS idx_appointment_doctor ON appointments(doctor_id)",
             "CREATE INDEX IF NOT EXISTS idx_appointment_date ON appointments(date)",
-            "CREATE INDEX IF NOT EXISTS idx_appointment_status ON appointments(status)"
+            "CREATE INDEX IF NOT EXISTS idx_appointment_status ON appointments(status)",
+            "CREATE INDEX IF NOT EXISTS idx_appointment_parent ON appointments(parent_appointment_id)"
         ]
 
 
@@ -202,7 +210,7 @@ class Notification:
         CREATE TABLE IF NOT EXISTS notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            type TEXT NOT NULL CHECK(type IN ('APPOINTMENT_ACCEPTED', 'APPOINTMENT_REJECTED', 'PRESCRIPTION_WRITTEN', 'APPOINTMENT_REQUESTED')),
+            type TEXT NOT NULL CHECK(type IN ('APPOINTMENT_ACCEPTED', 'APPOINTMENT_REJECTED', 'PRESCRIPTION_WRITTEN', 'APPOINTMENT_REQUESTED', 'FOLLOW_UP_REQUIRED')),
             message TEXT NOT NULL,
             link TEXT,
             is_read INTEGER DEFAULT 0,

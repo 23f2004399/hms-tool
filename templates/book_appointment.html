@@ -29,7 +29,8 @@
       <div class="doctors-grid" id="doctorsGrid">
         {% for doctor in doctors %}
         <div class="doctor-card">
-          <input type="radio" name="doctor_id" id="doctor_{{ doctor.id }}" value="{{ doctor.id }}" required>
+          <input type="radio" name="doctor_id" id="doctor_{{ doctor.id }}" value="{{ doctor.id }}" 
+                 {% if selected_doctor_id and selected_doctor_id == doctor.id %}checked{% endif %} required>
           <label for="doctor_{{ doctor.id }}">
             <div class="doctor-icon">
               <i class="fas fa-user-md"></i>
@@ -807,5 +808,18 @@ function showEmptyResults() {
   `;
   searchResults.style.display = 'block';
 }
+
+// Auto-scroll to selected doctor if coming from map
+document.addEventListener('DOMContentLoaded', () => {
+  const selectedDoctor = document.querySelector('input[name="doctor_id"]:checked');
+  if (selectedDoctor) {
+    setTimeout(() => {
+      selectedDoctor.closest('.doctor-card').scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }, 300);
+  }
+});
 </script>
 {% endblock %}

@@ -7,7 +7,8 @@ from database import (
     get_doctor_appointments, update_appointment_status, get_doctor_patients,
     get_patient_details, create_prescription, create_notification, execute_query,
     get_user_notifications, get_unread_notification_count, mark_notifications_as_read,
-    delete_read_notifications, get_doctor_stats, search_patients
+    delete_read_notifications, get_doctor_stats, search_patients, mark_follow_up_required,
+    mark_follow_up_complete
 )
 import json
 
@@ -282,3 +283,59 @@ def api_search_patients():
     
     except Exception as e:
         return jsonify({'success': False, 'message': str(e), 'patients': []})
+
+@doctor_bp.route('/schedule-follow-up', methods=['POST'])
+@role_required('DOCTOR')
+def schedule_follow_up():
+    """
+    Mark appointment as requiring follow-up and schedule suggested date
+    """
+    try:
+        appointment_id = request.form.get('appointment_id')
+        follow_up_date = request.form.get('follow_up_date')
+        follow_up_notes = request.form.get('follow_up_notes', '').strip()
+        
+        if not appointment_id or not follow_up_date:
+            flash('Missing required information', 'error')
+            return redirect(url_for('doctor.appointments'))
+        
+        doctor_id = session.get('user_id')
+        
+        # Get patient_id from appointment
+        query = "SELECT patient_id FROM appointments WHERE id = ?"
+        result = execute_query(query, (appointment_id,), fetchone=True)
+        
+        if not result:
+            flash('Appointment not found', 'error')
+            return redirect(url_for('doctor.appointments'))
+        
+        patient_id = result['patient_id']
+        
+        # Mark follow-up required and create notification
+        mark_follow_up_required(appointment_id, follow_up_date, doctor_id, patient_id)
+        
+        # Update appointment with follow-up notes if provided
+        if follow_up_notes:
+            update_query = "UPDATE appointments SET notes = ? WHERE id = ?"
+            execute_query(update_query, (follow_up_notes, appointment_id))
+        
+        flash(f'Follow-up scheduled successfully for {follow_up_date}', 'success')
+        return redirect(url_for('doctor.appointments'))
+        
+    except Exception as e:
+        flash(f'Error scheduling follow-up: {str(e)}', 'error')
+        return redirect(url_for('doctor.appointments'))
+
+@doctor_bp.route('/mark-follow-up-complete/<int:appointment_id>')
+@role_required('DOCTOR')
+def complete_follow_up(appointment_id):
+    """
+    Mark a follow-up as complete
+    """
+    try:
+        mark_follow_up_complete(appointment_id)
+        flash('Follow-up marked as complete', 'success')
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'error')
+    
+    return redirect(url_for('doctor.appointments'))

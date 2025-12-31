@@ -168,6 +168,7 @@
             const icon = notif.type === 'APPOINTMENT_ACCEPTED' ? 'fa-check-circle' :
                         notif.type === 'APPOINTMENT_REJECTED' ? 'fa-times-circle' :
                         notif.type === 'APPOINTMENT_REQUESTED' ? 'fa-calendar-plus' :
+                        notif.type === 'FOLLOW_UP_REQUIRED' ? 'fa-redo' :
                         'fa-prescription';
             const clickable = notif.link ? '' : 'non-clickable';
             

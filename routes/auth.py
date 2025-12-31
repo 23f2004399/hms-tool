@@ -5,6 +5,7 @@ Handles user signup, login, and logout
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import requests
 from database import (
     get_user_by_email, 
     insert_user, 
@@ -18,6 +19,64 @@ from database import (
 )
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def geocode_address(address):
+    """
+    Convert address to latitude/longitude using Nominatim (OpenStreetMap)
+    Free geocoding service, no API key required
+    """
+    try:
+        import time
+        # Add small delay to respect Nominatim usage policy (max 1 request per second)
+        time.sleep(1)
+        
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            'q': address,
+            'format': 'json',
+            'limit': 1,
+            'addressdetails': 1,
+            'countrycodes': 'in'  # Focus on India for better results
+        }
+        headers = {
+            'User-Agent': 'MediFriend-HMS/1.0 (Healthcare Management System)',
+            'Accept-Language': 'en'
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        if data and len(data) > 0:
+            return {
+                'latitude': float(data[0]['lat']),
+                'longitude': float(data[0]['lon']),
+                'display_name': data[0].get('display_name', ''),
+                'success': True
+            }
+        
+        # If no result, try with just city and state from the address
+        parts = [p.strip() for p in address.split(',')]
+        if len(parts) >= 2:
+            simplified = ', '.join(parts[-3:])  # Get last 3 parts (city, state, pincode)
+            params['q'] = simplified
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            data = response.json()
+            if data and len(data) > 0:
+                return {
+                    'latitude': float(data[0]['lat']),
+                    'longitude': float(data[0]['lon']),
+                    'display_name': data[0].get('display_name', ''),
+                    'success': True
+                }
+        
+        return {'success': False, 'error': 'Address not found. Please try with city name only.'}
+    
+    except requests.exceptions.Timeout:
+        return {'success': False, 'error': 'Geocoding timeout. Address saved, location will be updated later.'}
+    except Exception as e:
+        return {'success': False, 'error': f'Geocoding error: {str(e)}'}
 
 
 def login_required(f):
@@ -159,9 +218,10 @@ def doctor_signup():
         experience_years = request.form.get('experience_years', '').strip()
         consultation_fee = request.form.get('consultation_fee', '').strip()
         qualification = request.form.get('qualification', '').strip()
+        clinic_address = request.form.get('clinic_address', '').strip()
         
         # Validation
-        if not full_name or not email or not password or not specialization:
+        if not full_name or not email or not password or not specialization or not clinic_address:
             flash('Please fill in all required fields.', 'danger')
             return render_template('doctor_signup.html')
         
@@ -198,6 +258,14 @@ def doctor_signup():
                 flash('Error creating user account.', 'danger')
                 return render_template('doctor_signup.html')
             
+            # Geocode clinic address
+            geo_result = geocode_address(clinic_address)
+            latitude = geo_result.get('latitude') if geo_result['success'] else None
+            longitude = geo_result.get('longitude') if geo_result['success'] else None
+            
+            if not geo_result['success']:
+                flash(f"Note: Could not locate clinic address on map. You can update it later.", 'warning')
+            
             # Insert doctor details
             try:
                 insert_doctor_details(
@@ -205,7 +273,10 @@ def doctor_signup():
                     specialization=specialization,
                     qualification=qualification,
                     experience_years=int(experience_years) if experience_years else 0,
-                    consultation_fee=float(consultation_fee) if consultation_fee else 0.0
+                    consultation_fee=float(consultation_fee) if consultation_fee else 0.0,
+                    clinic_address=clinic_address,
+                    latitude=latitude,
+                    longitude=longitude
                 )
             except Exception as doctor_error:
                 print(f"Error inserting doctor details: {doctor_error}")

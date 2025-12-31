@@ -13,7 +13,8 @@ from database import (
     create_rating, check_existing_rating, get_doctor_ratings, get_doctor_average_rating,
     search_doctors,
     create_lab_report, get_patient_lab_reports, get_lab_report_by_id, delete_lab_report,
-    get_lab_report_trends, execute_query
+    get_lab_report_trends, get_patient_history, execute_query,
+    get_patient_follow_ups, get_doctors_with_location
 )
 from config import allowed_file, Config
 from datetime import date, datetime
@@ -52,9 +53,11 @@ def appointments():
     """
     user_id = session.get('user_id')
     appointments_list = get_patient_appointments(user_id)
+    follow_ups = get_patient_follow_ups(user_id)
     
     return render_template('patient_appointments.html', 
-                         appointments=appointments_list)
+                         appointments=appointments_list,
+                         follow_ups=follow_ups)
 
 
 @patient_bp.route('/book-appointment', methods=['GET', 'POST'])
@@ -96,9 +99,13 @@ def book_appointment():
     doctors = get_all_doctors()
     today = date.today().isoformat()
     
+    # Get pre-selected doctor from query params (from map)
+    selected_doctor_id = request.args.get('doctor_id', type=int)
+    
     return render_template('book_appointment.html', 
                          doctors=doctors,
-                         today=today)
+                         today=today,
+                         selected_doctor_id=selected_doctor_id)
 
 
 @patient_bp.route('/cancel-appointment/<int:appointment_id>', methods=['POST'])
@@ -412,8 +419,16 @@ def upload_test_report():
         
         # Get form data
         test_type = request.form.get('test_type', '').strip()
+        custom_test_type = request.form.get('custom_test_type', '').strip()
         test_date = request.form.get('test_date', '').strip()
         notes = request.form.get('notes', '').strip()
+        
+        # Use custom test type if "Other" was selected
+        if test_type == 'Other' and custom_test_type:
+            test_type = custom_test_type
+        elif test_type == 'Other' and not custom_test_type:
+            flash('Please specify the test type', 'danger')
+            return redirect(url_for('patient.upload_test_report'))
         
         if not test_type or not test_date:
             flash('Test type and date are required', 'danger')
@@ -590,3 +605,27 @@ JSON output:'''
         return {}
 
 
+@patient_bp.route('/history')
+@role_required('PATIENT')
+def history():
+    """Patient medical history timeline"""
+    patient_id = session.get('user_id')
+    
+    # Get complete patient history
+    history_items = get_patient_history(patient_id)
+    
+    return render_template('patient_history.html', 
+                         history=history_items)
+
+@patient_bp.route('/find-doctors')
+@role_required('PATIENT')
+def find_doctors():
+    """Interactive map to find nearby doctors"""
+    doctors = get_doctors_with_location()
+    
+    # Get unique specializations for filter
+    specializations = sorted(set(d['specialization'] for d in doctors if d['specialization']))
+    
+    return render_template('find_doctors.html',
+                         doctors=doctors,
+                         specializations=specializations)

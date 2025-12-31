@@ -139,15 +139,15 @@ def insert_patient_details(user_id, blood_group=None, allergies=None, chronic_co
     return execute_query(query, (user_id, blood_group, allergies, chronic_conditions, emergency_contact), commit=True)
 
 
-def insert_doctor_details(user_id, specialization, qualification=None, experience_years=0, consultation_fee=0.0, schedule_json=None):
+def insert_doctor_details(user_id, specialization, qualification=None, experience_years=0, consultation_fee=0.0, schedule_json=None, clinic_address=None, latitude=None, longitude=None):
     """
     Insert doctor-specific details
     """
     query = """
-        INSERT INTO doctor_details (user_id, specialization, qualification, experience_years, consultation_fee, schedule_json)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO doctor_details (user_id, specialization, qualification, experience_years, consultation_fee, schedule_json, clinic_address, latitude, longitude)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
-    return execute_query(query, (user_id, specialization, qualification, experience_years, consultation_fee, schedule_json), commit=True)
+    return execute_query(query, (user_id, specialization, qualification, experience_years, consultation_fee, schedule_json, clinic_address, latitude, longitude), commit=True)
 
 
 def get_all_doctors():
@@ -156,10 +156,28 @@ def get_all_doctors():
     """
     query = """
         SELECT u.*, d.specialization, d.experience_years, d.consultation_fee,
-               d.average_rating, d.total_ratings
+               d.average_rating, d.total_ratings, d.clinic_address, d.latitude, d.longitude
         FROM users u
         JOIN doctor_details d ON u.id = d.user_id
         WHERE u.role = 'DOCTOR'
+        ORDER BY d.average_rating DESC, u.full_name
+    """
+    return execute_query(query, fetchall=True)
+
+
+def get_doctors_with_location():
+    """
+    Get all doctors who have clinic location set (for map view)
+    """
+    query = """
+        SELECT u.id, u.full_name, u.email, u.phone,
+               d.specialization, d.experience_years, d.consultation_fee,
+               d.average_rating, d.total_ratings, d.clinic_address, d.latitude, d.longitude
+        FROM users u
+        JOIN doctor_details d ON u.id = d.user_id
+        WHERE u.role = 'DOCTOR' 
+        AND d.latitude IS NOT NULL 
+        AND d.longitude IS NOT NULL
         ORDER BY d.average_rating DESC, u.full_name
     """
     return execute_query(query, fetchall=True)
@@ -402,6 +420,105 @@ def cancel_appointment(appointment_id):
     Delete/cancel an appointment
     """
     query = "DELETE FROM appointments WHERE id = ?"
+    return execute_query(query, (appointment_id,), commit=True)
+
+
+def mark_follow_up_required(appointment_id, follow_up_date, doctor_id, patient_id):
+    """
+    Mark appointment as requiring follow-up and create notification
+    """
+    # Update appointment with follow-up details
+    query = """
+        UPDATE appointments
+        SET follow_up_required = 1, follow_up_date = ?
+        WHERE id = ?
+    """
+    execute_query(query, (follow_up_date, appointment_id), commit=True)
+    
+    # Create notification for patient
+    message = f"Your doctor recommends a follow-up visit on {follow_up_date}"
+    create_notification(
+        user_id=patient_id,
+        notification_type='FOLLOW_UP_REQUIRED',
+        message=message,
+        link='/patient/appointments',
+        appointment_id=appointment_id
+    )
+    
+    return True
+
+
+def create_follow_up_appointment(parent_appointment_id, patient_id, doctor_id, date, time):
+    """
+    Create a follow-up appointment linked to parent appointment
+    """
+    query = """
+        INSERT INTO appointments (patient_id, doctor_id, date, time, status, parent_appointment_id)
+        VALUES (?, ?, ?, ?, 'PENDING', ?)
+    """
+    return execute_query(query, (patient_id, doctor_id, date, time, parent_appointment_id), commit=True)
+
+
+def get_follow_up_recommendations(patient_id):
+    """
+    Get appointments that require follow-up but haven't been scheduled yet
+    """
+    query = """
+        SELECT 
+            a.id, a.date as original_date, a.follow_up_date,
+            u.full_name as doctor_name,
+            dd.specialization
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        LEFT JOIN doctor_details dd ON a.doctor_id = dd.user_id
+        WHERE a.patient_id = ? 
+        AND a.follow_up_required = 1
+        AND a.status = 'COMPLETED'
+        AND NOT EXISTS (
+            SELECT 1 FROM appointments f 
+            WHERE f.parent_appointment_id = a.id
+        )
+        ORDER BY a.follow_up_date ASC
+    """
+    return execute_query(query, (patient_id,), fetchall=True)
+
+
+def get_patient_follow_ups(patient_id):
+    """
+    Get all follow-up appointments for a patient (both pending and completed)
+    """
+    query = """
+        SELECT 
+            a.id,
+            a.date as appointment_date,
+            a.time as appointment_time,
+            a.follow_up_date,
+            a.status,
+            a.symptoms,
+            a.parent_appointment_id,
+            u.full_name as doctor_name,
+            dd.specialization,
+            dd.consultation_fee
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        LEFT JOIN doctor_details dd ON a.doctor_id = dd.user_id
+        WHERE a.patient_id = ?
+        AND a.follow_up_required = 1
+        AND a.status = 'COMPLETED'
+        ORDER BY a.date DESC
+    """
+    return execute_query(query, (patient_id,), fetchall=True)
+
+
+def mark_follow_up_complete(appointment_id):
+    """
+    Mark a follow-up appointment as complete (remove follow-up requirement)
+    """
+    query = """
+        UPDATE appointments
+        SET follow_up_required = 0
+        WHERE id = ?
+    """
     return execute_query(query, (appointment_id,), commit=True)
 
 
@@ -916,6 +1033,118 @@ def get_lab_report_trends(patient_id, test_type, parameter_name, limit=10):
                 })
     
     return trends
+
+
+def get_patient_history(patient_id):
+    """
+    Get complete patient history timeline: appointments, prescriptions, and lab reports
+    Returns combined data sorted by date
+    """
+    history = []
+    
+    # Get appointments
+    appointments_query = """
+        SELECT 
+            a.id, a.date, a.time, a.status, a.symptoms,
+            u.full_name as doctor_name,
+            dd.specialization, dd.consultation_fee
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        LEFT JOIN doctor_details dd ON a.doctor_id = dd.user_id
+        WHERE a.patient_id = ?
+        ORDER BY a.date DESC
+    """
+    appointments = execute_query(appointments_query, (patient_id,), fetchall=True)
+    
+    for apt in appointments:
+        history.append({
+            'type': 'appointment',
+            'date': apt['date'],
+            'time': apt.get('time', ''),
+            'title': f"Appointment with Dr. {apt['doctor_name']}",
+            'status': apt['status'],
+            'details': {
+                'specialization': apt['specialization'],
+                'symptoms': apt['symptoms'],
+                'consultation_fee': apt.get('consultation_fee')
+            }
+        })
+    
+    # Get prescriptions
+    prescriptions_query = """
+        SELECT 
+            p.id, p.created_at, p.diagnosis, p.medicines_json,
+            u.full_name as doctor_name,
+            dd.specialization
+        FROM prescriptions p
+        JOIN users u ON p.doctor_id = u.id
+        LEFT JOIN doctor_details dd ON p.doctor_id = dd.user_id
+        WHERE p.patient_id = ?
+        ORDER BY p.created_at DESC
+    """
+    prescriptions = execute_query(prescriptions_query, (patient_id,), fetchall=True)
+    
+    for presc in prescriptions:
+        # Count medicines
+        medicine_count = 0
+        if presc['medicines_json']:
+            try:
+                import json
+                medicines = json.loads(presc['medicines_json'])
+                medicine_count = len(medicines)
+            except:
+                pass
+        
+        history.append({
+            'type': 'prescription',
+            'date': presc['created_at'][:10],
+            'time': presc['created_at'][11:16] if len(presc['created_at']) > 10 else '',
+            'title': f"Prescription from Dr. {presc['doctor_name']}",
+            'status': 'completed',
+            'details': {
+                'specialization': presc['specialization'],
+                'diagnosis': presc['diagnosis'],
+                'medicine_count': medicine_count
+            }
+        })
+    
+    # Get lab reports
+    lab_reports_query = """
+        SELECT id, test_type, test_date, notes, extracted_values_json
+        FROM lab_reports
+        WHERE patient_id = ?
+        ORDER BY test_date DESC
+    """
+    lab_reports = execute_query(lab_reports_query, (patient_id,), fetchall=True)
+    
+    for report in lab_reports:
+        # Get key extracted values
+        key_values = {}
+        if report['extracted_values_json']:
+            try:
+                import json
+                all_values = json.loads(report['extracted_values_json'])
+                # Get first 3 values for display
+                key_values = dict(list(all_values.items())[:3])
+            except:
+                pass
+        
+        history.append({
+            'type': 'lab_report',
+            'date': report['test_date'],
+            'time': '',
+            'title': f"{report['test_type']} Test",
+            'status': 'completed',
+            'details': {
+                'notes': report['notes'],
+                'key_values': key_values
+            }
+        })
+    
+    # Sort all history by date (most recent first)
+    history.sort(key=lambda x: x['date'], reverse=True)
+    
+    return history
 
 
 # Run initialization if executed directly
