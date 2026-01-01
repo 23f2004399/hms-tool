@@ -44,7 +44,30 @@
           <i class="fas fa-rupee-sign"></i>
           <span>₹{{ appointment.consultation_fee }}</span>
         </div>
+        <div class="detail-item">
+          {% if appointment.consultation_mode == 'ONLINE' %}
+            <i class="fas fa-video"></i>
+            <span class="mode-badge mode-online">Online Consultation</span>
+          {% else %}
+            <i class="fas fa-hospital"></i>
+            <span class="mode-badge mode-physical">Physical Visit</span>
+          {% endif %}
+        </div>
       </div>
+      
+      {% if appointment.consultation_mode == 'ONLINE' and appointment.meet_link and appointment.status == 'CONFIRMED' %}
+      <div class="meet-link-section">
+        <strong><i class="fas fa-video"></i> Join Meeting:</strong>
+        <a href="{{ appointment.meet_link }}" target="_blank" class="meet-link-button">
+          <i class="fas fa-external-link-alt"></i> {{ appointment.meet_link }}
+        </a>
+      </div>
+      {% elif appointment.consultation_mode == 'PHYSICAL' and appointment.clinic_address %}
+      <div class="clinic-address-section">
+        <strong><i class="fas fa-map-marker-alt"></i> Clinic Address:</strong>
+        <p>{{ appointment.clinic_address }}</p>
+      </div>
+      {% endif %}
       
       {% if appointment.symptoms %}
       <div class="symptoms-section">
@@ -57,18 +80,25 @@
         <small class="created-date">
           <i class="fas fa-info-circle"></i> Booked on {{ appointment.created_at[:10] }}
         </small>
-        {% if appointment.status == 'PENDING' %}
-        <form method="POST" action="{{ url_for('patient.cancel_appointment_route', appointment_id=appointment.id) }}" 
-              onsubmit="return confirm('Are you sure you want to cancel this appointment?');" style="display: inline;">
-          <button type="submit" class="btn-cancel">
-            <i class="fas fa-times"></i> Cancel
-          </button>
-        </form>
-        {% elif appointment.status == 'COMPLETED' or appointment.status == 'REJECTED' %}
-        <a href="{{ url_for('patient.rate_doctor', appointment_id=appointment.id) }}" class="btn-rate">
-          <i class="fas fa-star"></i> Rate Doctor
-        </a>
-        {% endif %}
+        <div class="action-buttons">
+          {% if appointment.status == 'CONFIRMED' %}
+          <a href="{{ url_for('patient.download_calendar', appointment_id=appointment.id) }}" class="btn-calendar">
+            <i class="fas fa-calendar-plus"></i> Add to Calendar
+          </a>
+          {% endif %}
+          {% if appointment.status == 'PENDING' %}
+          <form method="POST" action="{{ url_for('patient.cancel_appointment_route', appointment_id=appointment.id) }}" 
+                onsubmit="return confirm('Are you sure you want to cancel this appointment?');" style="display: inline;">
+            <button type="submit" class="btn-cancel">
+              <i class="fas fa-times"></i> Cancel
+            </button>
+          </form>
+          {% elif appointment.status == 'COMPLETED' or appointment.status == 'REJECTED' %}
+          <a href="{{ url_for('patient.rate_doctor', appointment_id=appointment.id) }}" class="btn-rate">
+            <i class="fas fa-star"></i> Rate Doctor
+          </a>
+          {% endif %}
+        </div>
       </div>
     </div>
     {% endfor %}
@@ -116,11 +146,36 @@
               <span><strong>Follow-up Date:</strong> {{ followup.follow_up_date }}</span>
             </div>
           </div>
-          <div class="detail-item">
-            <i class="fas fa-rupee-sign"></i>
-            <span>Consultation Fee: ₹{{ followup.consultation_fee }}</span>
+          <div class="detail-row">
+            <div class="detail-item">
+              <i class="fas fa-rupee-sign"></i>
+              <span>Consultation Fee: ₹{{ followup.consultation_fee }}</span>
+            </div>
+            <div class="detail-item">
+              {% if followup.consultation_mode == 'ONLINE' %}
+                <i class="fas fa-video"></i>
+                <span class="mode-badge mode-online">Online Consultation</span>
+              {% else %}
+                <i class="fas fa-hospital"></i>
+                <span class="mode-badge mode-physical">Physical Visit</span>
+              {% endif %}
+            </div>
           </div>
         </div>
+        
+        {% if followup.consultation_mode == 'ONLINE' and followup.meet_link %}
+        <div class="meet-link-section">
+          <strong><i class="fas fa-video"></i> Join Follow-up Meeting:</strong>
+          <a href="{{ followup.meet_link }}" target="_blank" class="meet-link-button">
+            <i class="fas fa-external-link-alt"></i> {{ followup.meet_link }}
+          </a>
+        </div>
+        {% elif followup.consultation_mode == 'PHYSICAL' and followup.clinic_address %}
+        <div class="clinic-address-section">
+          <strong><i class="fas fa-map-marker-alt"></i> Clinic Address:</strong>
+          <p>{{ followup.clinic_address }}</p>
+        </div>
+        {% endif %}
         
         {% if followup.symptoms %}
         <div class="symptoms-section">
@@ -386,6 +441,12 @@
     margin-top: 12px;
   }
   
+  .action-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  
   .created-date {
     color: #999;
     font-size: 0.85rem;
@@ -393,6 +454,26 @@
   
   .created-date i {
     margin-right: 5px;
+  }
+  
+  .btn-calendar {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+  }
+  
+  .btn-calendar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   }
   
   .btn-cancel {
@@ -432,6 +513,84 @@
   
   .btn-rate i {
     font-size: 14px;
+  }
+  
+  /* Consultation Mode Badges */
+  .mode-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  
+  .mode-online {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .mode-physical {
+    background: linear-gradient(135deg, #48c774 0%, #38a169 100%);
+    color: white;
+  }
+  
+  /* Meet Link Section */
+  .meet-link-section {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+    border: 2px solid #667eea;
+  }
+  
+  .meet-link-section strong {
+    display: block;
+    margin-bottom: 10px;
+    color: #667eea;
+    font-size: 0.95rem;
+  }
+  
+  .meet-link-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s;
+    word-break: break-all;
+  }
+  
+  .meet-link-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  }
+  
+  /* Clinic Address Section */
+  .clinic-address-section {
+    background: linear-gradient(135deg, rgba(72, 199, 116, 0.1) 0%, rgba(56, 161, 105, 0.1) 100%);
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+    border: 2px solid #48c774;
+  }
+  
+  .clinic-address-section strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #38a169;
+    font-size: 0.95rem;
+  }
+  
+  .clinic-address-section p {
+    margin: 0;
+    color: #2d3748;
+    line-height: 1.6;
   }
   
   /* Info Card */

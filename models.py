@@ -85,6 +85,7 @@ class DoctorDetails:
             clinic_address TEXT,
             latitude REAL,
             longitude REAL,
+            consultation_modes TEXT DEFAULT 'PHYSICAL',
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
@@ -114,6 +115,8 @@ class Appointment:
             time TEXT NOT NULL,
             symptoms TEXT,
             status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'CONFIRMED', 'REJECTED', 'COMPLETED')),
+            consultation_mode TEXT DEFAULT 'PHYSICAL' CHECK(consultation_mode IN ('PHYSICAL', 'ONLINE')),
+            meet_link TEXT,
             follow_up_required INTEGER DEFAULT 0,
             follow_up_date TEXT,
             parent_appointment_id INTEGER,
@@ -296,6 +299,38 @@ class LabReport:
         ]
 
 
+class VitalSign:
+    """
+    Stores patient vital signs over time (BP, sugar, weight, temperature)
+    """
+    TABLE_NAME = "vital_signs"
+    
+    @staticmethod
+    def create_table_sql():
+        return """
+        CREATE TABLE IF NOT EXISTS vital_signs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id INTEGER NOT NULL,
+            vital_type TEXT NOT NULL CHECK(vital_type IN ('blood_pressure', 'blood_sugar', 'weight', 'temperature')),
+            value TEXT NOT NULL,
+            unit TEXT NOT NULL,
+            recorded_at TEXT NOT NULL,
+            recorded_by INTEGER,
+            notes TEXT,
+            FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE SET NULL
+        )
+        """
+    
+    @staticmethod
+    def create_indexes_sql():
+        return [
+            "CREATE INDEX IF NOT EXISTS idx_vitals_patient ON vital_signs(patient_id)",
+            "CREATE INDEX IF NOT EXISTS idx_vitals_type ON vital_signs(vital_type)",
+            "CREATE INDEX IF NOT EXISTS idx_vitals_date ON vital_signs(recorded_at)"
+        ]
+
+
 # List of all model classes for easy iteration
 ALL_MODELS = [
     User,
@@ -306,5 +341,6 @@ ALL_MODELS = [
     Upload,
     Notification,
     DoctorRating,
-    LabReport
+    LabReport,
+    VitalSign
 ]

@@ -1,14 +1,14 @@
 """
 Doctor Routes for MediFriend
 """
-from flask import Blueprint, render_template, session, redirect, url_for, flash, request, jsonify
+from flask import Blueprint, render_template, session, redirect, url_for, flash, request, jsonify, make_response
 from routes.auth import role_required
 from database import (
     get_doctor_appointments, update_appointment_status, get_doctor_patients,
     get_patient_details, create_prescription, create_notification, execute_query,
     get_user_notifications, get_unread_notification_count, mark_notifications_as_read,
     delete_read_notifications, get_doctor_stats, search_patients, mark_follow_up_required,
-    mark_follow_up_complete
+    mark_follow_up_complete, generate_ics_calendar, get_doctor_today_appointments
 )
 import json
 
@@ -27,10 +27,14 @@ def dashboard():
     # Get statistics
     stats = get_doctor_stats(user_id)
     
+    # Get today's appointments
+    today_appointments = get_doctor_today_appointments(user_id)
+    
     return render_template('doctor_dashboard.html',
                          doctor_name=full_name,
                          doctor_id=user_id,
-                         stats=stats)
+                         stats=stats,
+                         today_appointments=today_appointments)
 
 
 @doctor_bp.route('/appointments')
@@ -339,3 +343,45 @@ def complete_follow_up(appointment_id):
         flash(f'Error: {str(e)}', 'error')
     
     return redirect(url_for('doctor.appointments'))
+
+
+@doctor_bp.route('/download-calendar/<int:appointment_id>')
+@role_required('DOCTOR')
+def download_calendar(appointment_id):
+    """Download .ics calendar file for appointment"""
+    doctor_id = session.get('user_id')
+    
+    # Get appointment details
+    query = """
+        SELECT a.*, 
+               u.full_name as patient_name,
+               dd.clinic_address
+        FROM appointments a
+        JOIN users u ON a.patient_id = u.id
+        LEFT JOIN doctor_details dd ON a.doctor_id = dd.user_id
+        WHERE a.id = ? AND a.doctor_id = ?
+    """
+    appointment = execute_query(query, (appointment_id, doctor_id), fetchone=True)
+    
+    if not appointment:
+        flash('Appointment not found.', 'danger')
+        return redirect(url_for('doctor.appointments'))
+    
+    # Generate .ics content
+    ics_content = generate_ics_calendar({
+        'patient_name': appointment['patient_name'],
+        'doctor_name': session.get('full_name'),
+        'date': appointment['date'],
+        'time': appointment['time'],
+        'consultation_mode': appointment['consultation_mode'],
+        'meet_link': appointment.get('meet_link'),
+        'clinic_address': appointment.get('clinic_address'),
+        'symptoms': appointment.get('symptoms')
+    })
+    
+    # Create response with .ics file
+    response = make_response(ics_content)
+    response.headers['Content-Type'] = 'text/calendar; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename=appointment_{appointment_id}.ics'
+    
+    return response

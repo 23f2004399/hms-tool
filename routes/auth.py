@@ -220,9 +220,17 @@ def doctor_signup():
         qualification = request.form.get('qualification', '').strip()
         clinic_address = request.form.get('clinic_address', '').strip()
         
+        # Get consultation modes (checkbox values)
+        consultation_modes = request.form.getlist('consultation_modes')  # Returns list like ['PHYSICAL', 'ONLINE']
+        consultation_modes_str = ','.join(consultation_modes) if consultation_modes else 'PHYSICAL'
+        
         # Validation
         if not full_name or not email or not password or not specialization or not clinic_address:
             flash('Please fill in all required fields.', 'danger')
+            return render_template('doctor_signup.html')
+        
+        if not consultation_modes:
+            flash('Please select at least one consultation mode.', 'danger')
             return render_template('doctor_signup.html')
         
         if password != confirm_password:
@@ -276,7 +284,8 @@ def doctor_signup():
                     consultation_fee=float(consultation_fee) if consultation_fee else 0.0,
                     clinic_address=clinic_address,
                     latitude=latitude,
-                    longitude=longitude
+                    longitude=longitude,
+                    consultation_modes=consultation_modes_str
                 )
             except Exception as doctor_error:
                 print(f"Error inserting doctor details: {doctor_error}")

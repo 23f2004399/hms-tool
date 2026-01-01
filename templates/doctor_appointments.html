@@ -46,7 +46,26 @@
           <i class="fas fa-info-circle"></i>
           <span>Booked on {{ appointment.created_at[:10] }}</span>
         </div>
+        <div class="detail-item">
+          {% if appointment.consultation_mode == 'ONLINE' %}
+            <i class="fas fa-video"></i>
+            <span class="mode-badge mode-online">Online Consultation</span>
+          {% else %}
+            <i class="fas fa-hospital"></i>
+            <span class="mode-badge mode-physical">Physical Visit</span>
+          {% endif %}
+        </div>
       </div>
+      
+      {% if appointment.consultation_mode == 'ONLINE' and appointment.meet_link %}
+      <div class="meet-link-section">
+        <strong><i class="fas fa-video"></i> Meeting Link:</strong>
+        <a href="{{ appointment.meet_link }}" target="_blank" class="meet-link-button">
+          <i class="fas fa-external-link-alt"></i> {{ appointment.meet_link }}
+        </a>
+        <small class="meet-help">Share this link with your patient for the online consultation</small>
+      </div>
+      {% endif %}
       
       {% if appointment.symptoms %}
       <div class="symptoms-section">
@@ -69,6 +88,9 @@
           </button>
         </form>
         {% elif appointment.status == 'CONFIRMED' %}
+        <a href="{{ url_for('doctor.download_calendar', appointment_id=appointment.id) }}" class="btn-calendar">
+          <i class="fas fa-calendar-plus"></i> Add to Calendar
+        </a>
         <form method="POST" action="{{ url_for('doctor.complete_appointment', appointment_id=appointment.id) }}" style="display: inline;">
           <button type="submit" class="btn-complete">
             <i class="fas fa-check-circle"></i> Mark as Completed
@@ -399,6 +421,26 @@
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   }
   
+  .btn-calendar {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+  }
+  
+  .btn-calendar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+  
   .completed-label {
     color: #6c757d;
     font-weight: 600;
@@ -496,6 +538,71 @@
   .btn-complete-followup:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  }
+  
+  /* Consultation Mode Badges */
+  .mode-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  
+  .mode-online {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .mode-physical {
+    background: linear-gradient(135deg, #48c774 0%, #38a169 100%);
+    color: white;
+  }
+  
+  /* Meet Link Section */
+  .meet-link-section {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    border: 2px solid #667eea;
+  }
+  
+  .meet-link-section strong {
+    display: block;
+    margin-bottom: 10px;
+    color: #667eea;
+    font-size: 0.95rem;
+  }
+  
+  .meet-link-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s;
+    word-break: break-all;
+  }
+  
+  .meet-link-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  }
+  
+  .meet-help {
+    display: block;
+    margin-top: 10px;
+    color: #666;
+    font-size: 0.85rem;
+    font-style: italic;
   }
   
   /* Modal Styles */

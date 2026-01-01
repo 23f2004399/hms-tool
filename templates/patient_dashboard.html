@@ -44,6 +44,14 @@
     </div>
     
     <div class="dashboard-card action-card">
+      <a href="{{ url_for('patient.vitals') }}" class="action-link">
+        <i class="fas fa-heartbeat"></i>
+        <h3>My Vitals</h3>
+        <p>Track BP, sugar, weight & more</p>
+      </a>
+    </div>
+    
+    <div class="dashboard-card action-card">
       <a href="{{ url_for('patient.history') }}" class="action-link">
         <i class="fas fa-history"></i>
         <h3>Medical History</h3>
@@ -56,14 +64,6 @@
         <i class="fas fa-map-marked-alt"></i>
         <h3>Find Doctors</h3>
         <p>Discover nearby healthcare professionals</p>
-      </a>
-    </div>
-    
-    <div class="dashboard-card action-card">
-      <a href="{{ url_for('auth.profile') }}" class="action-link">
-        <i class="fas fa-user-circle"></i>
-        <h3>My Profile</h3>
-        <p>Update your information</p>
       </a>
     </div>
   </div>

@@ -1,0 +1,714 @@
+{% extends "base.html" %}
+
+{% block title %}My Vitals - MediFriend{% endblock %}
+
+{% block content %}
+<div class="vitals-container">
+  <div class="vitals-header">
+    <h1><i class="fas fa-heartbeat"></i> My Health Vitals</h1>
+    <button class="btn-log-vital" onclick="document.getElementById('logVitalModal').style.display='block'">
+      <i class="fas fa-plus"></i> Log New Vital
+    </button>
+  </div>
+  
+  <!-- Alert Summary -->
+  {% set has_alerts = vitals_analysis.blood_pressure.alert or vitals_analysis.blood_sugar.alert or 
+                      vitals_analysis.weight.alert or vitals_analysis.temperature.alert %}
+  
+  {% if has_alerts %}
+  <div class="alerts-section">
+    <h3><i class="fas fa-exclamation-triangle"></i> Health Alerts</h3>
+    <div class="alert-cards">
+      {% if vitals_analysis.blood_pressure.alert %}
+      <div class="alert-card alert-warning">
+        <i class="fas fa-heart-pulse"></i>
+        <strong>Blood Pressure:</strong> {{ vitals_analysis.blood_pressure.alert_message }}
+      </div>
+      {% endif %}
+      
+      {% if vitals_analysis.blood_sugar.alert %}
+      <div class="alert-card alert-warning">
+        <i class="fas fa-droplet"></i>
+        <strong>Blood Sugar:</strong> {{ vitals_analysis.blood_sugar.alert_message }}
+      </div>
+      {% endif %}
+      
+      {% if vitals_analysis.temperature.alert %}
+      <div class="alert-card alert-warning">
+        <i class="fas fa-thermometer"></i>
+        <strong>Temperature:</strong> {{ vitals_analysis.temperature.alert_message }}
+      </div>
+      {% endif %}
+      
+      {% if vitals_analysis.weight.alert %}
+      <div class="alert-card alert-info">
+        <i class="fas fa-weight-scale"></i>
+        <strong>Weight:</strong> {{ vitals_analysis.weight.alert_message }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+  
+  <!-- Quick Stats -->
+  <div class="quick-stats">
+    <div class="stat-box">
+      <div class="stat-icon bp-icon">
+        <i class="fas fa-heart-pulse"></i>
+      </div>
+      <div class="stat-info">
+        <h4>Blood Pressure</h4>
+        <p class="stat-value">{{ vitals_analysis.blood_pressure.current or 'No data' }}</p>
+        <span class="trend-badge trend-{{ vitals_analysis.blood_pressure.trend }}">
+          {% if vitals_analysis.blood_pressure.trend == 'increasing' %}
+            <i class="fas fa-arrow-up"></i> Increasing
+          {% elif vitals_analysis.blood_pressure.trend == 'decreasing' %}
+            <i class="fas fa-arrow-down"></i> Decreasing
+          {% else %}
+            <i class="fas fa-arrow-right"></i> Stable
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    
+    <div class="stat-box">
+      <div class="stat-icon sugar-icon">
+        <i class="fas fa-droplet"></i>
+      </div>
+      <div class="stat-info">
+        <h4>Blood Sugar</h4>
+        <p class="stat-value">{{ vitals_analysis.blood_sugar.current or 'No data' }} {% if vitals_analysis.blood_sugar.current %}mg/dL{% endif %}</p>
+        <span class="trend-badge trend-{{ vitals_analysis.blood_sugar.trend }}">
+          {% if vitals_analysis.blood_sugar.trend == 'increasing' %}
+            <i class="fas fa-arrow-up"></i> Increasing
+          {% elif vitals_analysis.blood_sugar.trend == 'decreasing' %}
+            <i class="fas fa-arrow-down"></i> Decreasing
+          {% else %}
+            <i class="fas fa-arrow-right"></i> Stable
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    
+    <div class="stat-box">
+      <div class="stat-icon weight-icon">
+        <i class="fas fa-weight-scale"></i>
+      </div>
+      <div class="stat-info">
+        <h4>Weight</h4>
+        <p class="stat-value">{{ vitals_analysis.weight.current or 'No data' }} {% if vitals_analysis.weight.current %}kg{% endif %}</p>
+        <span class="trend-badge trend-{{ vitals_analysis.weight.trend }}">
+          {% if vitals_analysis.weight.trend == 'increasing' %}
+            <i class="fas fa-arrow-up"></i> Increasing
+          {% elif vitals_analysis.weight.trend == 'decreasing' %}
+            <i class="fas fa-arrow-down"></i> Decreasing
+          {% else %}
+            <i class="fas fa-arrow-right"></i> Stable
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    
+    <div class="stat-box">
+      <div class="stat-icon temp-icon">
+        <i class="fas fa-thermometer"></i>
+      </div>
+      <div class="stat-info">
+        <h4>Temperature</h4>
+        <p class="stat-value">{{ vitals_analysis.temperature.current or 'No data' }} {% if vitals_analysis.temperature.current %}°F{% endif %}</p>
+        <span class="trend-badge trend-{{ vitals_analysis.temperature.trend }}">
+          {% if vitals_analysis.temperature.trend == 'increasing' %}
+            <i class="fas fa-arrow-up"></i> Increasing
+          {% elif vitals_analysis.temperature.trend == 'decreasing' %}
+            <i class="fas fa-arrow-down"></i> Decreasing
+          {% else %}
+            <i class="fas fa-arrow-right"></i> Stable
+          {% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Graphs Section -->
+  <div class="graphs-section">
+    <div class="graph-card">
+      <h3><i class="fas fa-heart-pulse"></i> Blood Pressure Trend (30 Days)</h3>
+      <canvas id="bpChart"></canvas>
+    </div>
+    
+    <div class="graph-card">
+      <h3><i class="fas fa-droplet"></i> Blood Sugar Trend (30 Days)</h3>
+      <canvas id="sugarChart"></canvas>
+    </div>
+    
+    <div class="graph-card">
+      <h3><i class="fas fa-weight-scale"></i> Weight Trend (30 Days)</h3>
+      <canvas id="weightChart"></canvas>
+    </div>
+    
+    <div class="graph-card">
+      <h3><i class="fas fa-thermometer"></i> Temperature Trend (30 Days)</h3>
+      <canvas id="tempChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Log Vital Modal -->
+<div id="logVitalModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="document.getElementById('logVitalModal').style.display='none'">&times;</span>
+    <h2><i class="fas fa-plus-circle"></i> Log New Vital Reading</h2>
+    
+    <form method="POST" action="{{ url_for('patient.log_vital') }}">
+      <div class="form-group">
+        <label for="vital_type">Vital Type</label>
+        <select name="vital_type" id="vital_type" required onchange="updateVitalForm()">
+          <option value="">Select vital type...</option>
+          <option value="blood_pressure">Blood Pressure</option>
+          <option value="blood_sugar">Blood Sugar</option>
+          <option value="weight">Weight</option>
+          <option value="temperature">Temperature</option>
+        </select>
+      </div>
+      
+      <div id="bpInputs" class="vital-inputs" style="display: none;">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="systolic">Systolic</label>
+            <input type="number" id="systolic" name="systolic" placeholder="120" min="60" max="250">
+          </div>
+          <div class="form-group">
+            <label for="diastolic">Diastolic</label>
+            <input type="number" id="diastolic" name="diastolic" placeholder="80" min="40" max="150">
+          </div>
+        </div>
+      </div>
+      
+      <div id="sugarInputs" class="vital-inputs" style="display: none;">
+        <div class="form-group">
+          <label for="sugar_value">Blood Sugar (mg/dL)</label>
+          <input type="number" id="sugar_value" name="sugar_value" placeholder="95" min="20" max="600">
+        </div>
+      </div>
+      
+      <div id="weightInputs" class="vital-inputs" style="display: none;">
+        <div class="form-group">
+          <label for="weight_value">Weight (kg)</label>
+          <input type="number" step="0.1" id="weight_value" name="weight_value" placeholder="70.5" min="1" max="300">
+        </div>
+      </div>
+      
+      <div id="tempInputs" class="vital-inputs" style="display: none;">
+        <div class="form-group">
+          <label for="temp_value">Temperature (°F)</label>
+          <input type="number" step="0.1" id="temp_value" name="temp_value" placeholder="98.6" min="90" max="110">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="notes">Notes (optional)</label>
+        <textarea name="notes" id="notes" rows="2" placeholder="Any observations..."></textarea>
+      </div>
+      
+      <button type="submit" class="btn-primary">
+        <i class="fas fa-save"></i> Save Reading
+      </button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .vitals-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .vitals-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+  }
+  
+  .vitals-header h1 {
+    color: #333;
+    font-size: 2rem;
+  }
+  
+  .vitals-header h1 i {
+    color: #667eea;
+    margin-right: 10px;
+  }
+  
+  .btn-log-vital {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  }
+  
+  .btn-log-vital:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+  }
+  
+  /* Alerts Section */
+  .alerts-section {
+    background: #fff8e1;
+    padding: 20px;
+    border-radius: 15px;
+    margin-bottom: 30px;
+    border-left: 5px solid #ffa726;
+  }
+  
+  .alerts-section h3 {
+    color: #f57c00;
+    margin-bottom: 15px;
+  }
+  
+  .alert-cards {
+    display: grid;
+    gap: 12px;
+  }
+  
+  .alert-card {
+    padding: 12px 15px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .alert-warning {
+    background: #ffebee;
+    color: #c62828;
+    border-left: 4px solid #c62828;
+  }
+  
+  .alert-info {
+    background: #e3f2fd;
+    color: #1565c0;
+    border-left: 4px solid #1565c0;
+  }
+  
+  /* Quick Stats */
+  .quick-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+  
+  .stat-box {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    display: flex;
+    gap: 15px;
+    align-items: center;
+  }
+  
+  .stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: white;
+  }
+  
+  .bp-icon {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
+  
+  .sugar-icon {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  }
+  
+  .weight-icon {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  }
+  
+  .temp-icon {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+  }
+  
+  .stat-info h4 {
+    margin: 0 0 5px 0;
+    color: #666;
+    font-size: 0.9rem;
+  }
+  
+  .stat-value {
+    margin: 5px 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #333;
+  }
+  
+  .trend-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  
+  .trend-increasing {
+    background: #ffebee;
+    color: #c62828;
+  }
+  
+  .trend-decreasing {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+  
+  .trend-stable {
+    background: #e3f2fd;
+    color: #1565c0;
+  }
+  
+  /* Graphs */
+  .graphs-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: 25px;
+  }
+  
+  .graph-card {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  }
+  
+  .graph-card h3 {
+    color: #333;
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+  }
+  
+  .graph-card h3 i {
+    color: #667eea;
+    margin-right: 8px;
+  }
+  
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+  }
+  
+  .modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+    position: relative;
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .modal-content::-webkit-scrollbar {
+    width: 0;
+    background: transparent;
+  }
+  
+  .modal-content {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  .modal-content h2 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    margin: 0;
+    padding: 25px 30px;
+    border-radius: 15px 15px 0 0;
+    font-size: 1.3rem;
+  }
+  
+  .modal-content h2 i {
+    margin-right: 10px;
+  }
+  
+  .modal-content form {
+    padding: 35px;
+  }
+  
+  .modal-content .form-group {
+    margin-bottom: 25px;
+  }
+  
+  .modal-content .form-group label {
+    display: block;
+    margin-bottom: 10px;
+    color: #333;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  
+  .modal-content .form-group input,
+  .modal-content .form-group select,
+  .modal-content .form-group textarea {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #e0e4ff;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s;
+    box-sizing: border-box;
+  }
+  
+  .modal-content .form-group input:focus,
+  .modal-content .form-group select:focus,
+  .modal-content .form-group textarea:focus {
+    border-color: #667eea;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .modal-content .form-group input:invalid:not(:placeholder-shown),
+  .modal-content .form-group select:invalid:not(:placeholder-shown) {
+    border-color: #f5576c;
+    box-shadow: 0 0 0 3px rgba(245, 87, 108, 0.1);
+  }
+  
+  .close {
+    color: white;
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+    opacity: 0.9;
+    z-index: 10;
+  }
+  
+  .close:hover {
+    opacity: 1;
+  }
+  
+  .modal-content button[type="submit"] {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    width: 100%;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    margin-top: 10px;
+  }
+  
+  .modal-content button[type="submit"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+  }
+  
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  
+  .vital-inputs {
+    margin: 5px 0 20px 0;
+    padding: 20px;
+    background: #f8f9ff;
+    border-radius: 12px;
+    border: 2px solid #e0e4ff;
+  }
+  
+  @media (max-width: 768px) {
+    .graphs-section {
+      grid-template-columns: 1fr;
+    }
+    
+    .quick-stats {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Update form based on vital type selection
+  function updateVitalForm() {
+    const vitalType = document.getElementById('vital_type').value;
+    const allInputs = document.querySelectorAll('.vital-inputs');
+    
+    // Hide all and remove required
+    allInputs.forEach(input => {
+      input.style.display = 'none';
+      const fields = input.querySelectorAll('input');
+      fields.forEach(field => field.removeAttribute('required'));
+    });
+    
+    // Show selected and add required
+    if (vitalType === 'blood_pressure') {
+      document.getElementById('bpInputs').style.display = 'block';
+      document.getElementById('systolic').setAttribute('required', 'required');
+      document.getElementById('diastolic').setAttribute('required', 'required');
+    } else if (vitalType === 'blood_sugar') {
+      document.getElementById('sugarInputs').style.display = 'block';
+      document.getElementById('sugar_value').setAttribute('required', 'required');
+    } else if (vitalType === 'weight') {
+      document.getElementById('weightInputs').style.display = 'block';
+      document.getElementById('weight_value').setAttribute('required', 'required');
+    } else if (vitalType === 'temperature') {
+      document.getElementById('tempInputs').style.display = 'block';
+      document.getElementById('temp_value').setAttribute('required', 'required');
+    }
+  }
+  
+  // Chart data from backend
+  const vitalsData = {{ vitals_data|tojson }};
+  
+  // Common chart options
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: {
+        display: false
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false
+        }
+      },
+      y: {
+        beginAtZero: false
+      }
+    }
+  };
+  
+  // Blood Pressure Chart
+  const bpData = vitalsData.blood_pressure;
+  new Chart(document.getElementById('bpChart'), {
+    type: 'line',
+    data: {
+      labels: bpData.dates,
+      datasets: [{
+        label: 'Systolic',
+        data: bpData.systolic,
+        borderColor: '#f5576c',
+        backgroundColor: 'rgba(245, 87, 108, 0.1)',
+        tension: 0.4,
+        fill: true
+      }, {
+        label: 'Diastolic',
+        data: bpData.diastolic,
+        borderColor: '#f093fb',
+        backgroundColor: 'rgba(240, 147, 251, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: {
+      ...chartOptions,
+      plugins: {
+        legend: {
+          display: true
+        }
+      }
+    }
+  });
+  
+  // Blood Sugar Chart
+  const sugarData = vitalsData.blood_sugar;
+  new Chart(document.getElementById('sugarChart'), {
+    type: 'line',
+    data: {
+      labels: sugarData.dates,
+      datasets: [{
+        label: 'Blood Sugar (mg/dL)',
+        data: sugarData.values,
+        borderColor: '#00f2fe',
+        backgroundColor: 'rgba(0, 242, 254, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: chartOptions
+  });
+  
+  // Weight Chart
+  const weightData = vitalsData.weight;
+  new Chart(document.getElementById('weightChart'), {
+    type: 'line',
+    data: {
+      labels: weightData.dates,
+      datasets: [{
+        label: 'Weight (kg)',
+        data: weightData.values,
+        borderColor: '#38f9d7',
+        backgroundColor: 'rgba(56, 249, 215, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: chartOptions
+  });
+  
+  // Temperature Chart
+  const tempData = vitalsData.temperature;
+  new Chart(document.getElementById('tempChart'), {
+    type: 'line',
+    data: {
+      labels: tempData.dates,
+      datasets: [{
+        label: 'Temperature (°F)',
+        data: tempData.values,
+        borderColor: '#fee140',
+        backgroundColor: 'rgba(254, 225, 64, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: chartOptions
+  });
+</script>
+{% endblock %}
