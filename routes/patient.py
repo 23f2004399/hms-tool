@@ -1,7 +1,7 @@
 """
 Patient Routes for MediFriend
 """
-from flask import Blueprint, render_template, session, redirect, url_for, flash, request, jsonify
+from flask import Blueprint, render_template, session, redirect, url_for, flash, request, jsonify, make_response
 from routes.auth import role_required
 from database import (
     get_all_doctors, create_appointment, get_patient_appointments,
@@ -13,7 +13,9 @@ from database import (
     create_rating, check_existing_rating, get_doctor_ratings, get_doctor_average_rating,
     search_doctors,
     create_lab_report, get_patient_lab_reports, get_lab_report_by_id, delete_lab_report,
-    get_lab_report_trends, execute_query
+    get_lab_report_trends, get_patient_history, execute_query,
+    get_patient_follow_ups, get_doctors_with_location, generate_ics_calendar, get_ist_today,
+    create_vital_sign, get_patient_vitals, analyze_vital_trends
 )
 from config import allowed_file, Config
 from datetime import date, datetime
@@ -52,9 +54,11 @@ def appointments():
     """
     user_id = session.get('user_id')
     appointments_list = get_patient_appointments(user_id)
+    follow_ups = get_patient_follow_ups(user_id)
     
     return render_template('patient_appointments.html', 
-                         appointments=appointments_list)
+                         appointments=appointments_list,
+                         follow_ups=follow_ups)
 
 
 @patient_bp.route('/book-appointment', methods=['GET', 'POST'])
@@ -69,6 +73,7 @@ def book_appointment():
         appointment_date = request.form.get('date')
         appointment_time = request.form.get('time')
         symptoms = request.form.get('symptoms', '').strip()
+        consultation_mode = request.form.get('consultation_mode', 'PHYSICAL').strip()
         
         # Validation
         if not doctor_id or not appointment_date or not appointment_time:
@@ -82,10 +87,14 @@ def book_appointment():
                 doctor_id=int(doctor_id),
                 date=appointment_date,
                 time=appointment_time,
-                symptoms=symptoms if symptoms else None
+                symptoms=symptoms if symptoms else None,
+                consultation_mode=consultation_mode
             )
             
-            flash('Appointment scheduled successfully! Waiting for doctor confirmation.', 'success')
+            if consultation_mode == 'ONLINE':
+                flash('Online appointment scheduled successfully! You will receive the Jitsi Meet link once the doctor confirms.', 'success')
+            else:
+                flash('Physical appointment scheduled successfully! Waiting for doctor confirmation.', 'success')
             return redirect(url_for('patient.dashboard'))
             
         except Exception as e:
@@ -94,11 +103,15 @@ def book_appointment():
     
     # GET request - show booking form
     doctors = get_all_doctors()
-    today = date.today().isoformat()
+    today = get_ist_today().isoformat()
+    
+    # Get pre-selected doctor from query params (from map)
+    selected_doctor_id = request.args.get('doctor_id', type=int)
     
     return render_template('book_appointment.html', 
                          doctors=doctors,
-                         today=today)
+                         today=today,
+                         selected_doctor_id=selected_doctor_id)
 
 
 @patient_bp.route('/cancel-appointment/<int:appointment_id>', methods=['POST'])
@@ -412,8 +425,16 @@ def upload_test_report():
         
         # Get form data
         test_type = request.form.get('test_type', '').strip()
+        custom_test_type = request.form.get('custom_test_type', '').strip()
         test_date = request.form.get('test_date', '').strip()
         notes = request.form.get('notes', '').strip()
+        
+        # Use custom test type if "Other" was selected
+        if test_type == 'Other' and custom_test_type:
+            test_type = custom_test_type
+        elif test_type == 'Other' and not custom_test_type:
+            flash('Please specify the test type', 'danger')
+            return redirect(url_for('patient.upload_test_report'))
         
         if not test_type or not test_date:
             flash('Test type and date are required', 'danger')
@@ -590,3 +611,166 @@ JSON output:'''
         return {}
 
 
+@patient_bp.route('/history')
+@role_required('PATIENT')
+def history():
+    """Patient medical history timeline"""
+    patient_id = session.get('user_id')
+    
+    # Get complete patient history
+    history_items = get_patient_history(patient_id)
+    
+    return render_template('patient_history.html', 
+                         history=history_items)
+
+@patient_bp.route('/find-doctors')
+@role_required('PATIENT')
+def find_doctors():
+    """Interactive map to find nearby doctors"""
+    doctors = get_doctors_with_location()
+    
+    # Get unique specializations for filter
+    specializations = sorted(set(d['specialization'] for d in doctors if d['specialization']))
+    
+    return render_template('find_doctors.html',
+                         doctors=doctors,
+                         specializations=specializations)
+
+
+@patient_bp.route('/download-calendar/<int:appointment_id>')
+@role_required('PATIENT')
+def download_calendar(appointment_id):
+    """Download .ics calendar file for appointment"""
+    patient_id = session.get('user_id')
+    
+    # Get appointment details
+    query = """
+        SELECT a.*, 
+               u.full_name as doctor_name,
+               dd.clinic_address
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        LEFT JOIN doctor_details dd ON a.doctor_id = dd.user_id
+        WHERE a.id = ? AND a.patient_id = ?
+    """
+    appointment = execute_query(query, (appointment_id, patient_id), fetchone=True)
+    
+    if not appointment:
+        flash('Appointment not found.', 'danger')
+        return redirect(url_for('patient.appointments'))
+    
+    # Generate .ics content
+    ics_content = generate_ics_calendar({
+        'patient_name': session.get('full_name'),
+        'doctor_name': appointment['doctor_name'],
+        'date': appointment['date'],
+        'time': appointment['time'],
+        'consultation_mode': appointment['consultation_mode'],
+        'meet_link': appointment.get('meet_link'),
+        'clinic_address': appointment.get('clinic_address'),
+        'symptoms': appointment.get('symptoms')
+    })
+    
+    # Create response with .ics file
+    response = make_response(ics_content)
+    response.headers['Content-Type'] = 'text/calendar; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename=appointment_{appointment_id}.ics'
+    
+    return response
+
+
+@patient_bp.route('/vitals')
+@role_required('PATIENT')
+def vitals():
+    """
+    Patient vitals tracking page with graphs
+    """
+    user_id = session.get('user_id')
+    
+    # Get vitals data for each type
+    bp_vitals = get_patient_vitals(user_id, 'blood_pressure', days=30)
+    sugar_vitals = get_patient_vitals(user_id, 'blood_sugar', days=30)
+    weight_vitals = get_patient_vitals(user_id, 'weight', days=30)
+    temp_vitals = get_patient_vitals(user_id, 'temperature', days=30)
+    
+    # Analyze trends
+    vitals_analysis = {
+        'blood_pressure': analyze_vital_trends(user_id, 'blood_pressure'),
+        'blood_sugar': analyze_vital_trends(user_id, 'blood_sugar'),
+        'weight': analyze_vital_trends(user_id, 'weight'),
+        'temperature': analyze_vital_trends(user_id, 'temperature')
+    }
+    
+    # Format data for Chart.js (filter out empty/invalid values)
+    def safe_bp_values(vitals):
+        result = {'dates': [], 'systolic': [], 'diastolic': []}
+        for v in reversed(vitals):
+            try:
+                if v['value'] and '/' in v['value']:
+                    parts = v['value'].split('/')
+                    result['dates'].append(v['recorded_at'][:10])
+                    result['systolic'].append(int(parts[0]))
+                    result['diastolic'].append(int(parts[1]))
+            except (ValueError, IndexError):
+                continue
+        return result
+    
+    def safe_numeric_values(vitals):
+        result = {'dates': [], 'values': []}
+        for v in reversed(vitals):
+            try:
+                if v['value'] and v['value'].strip():
+                    result['dates'].append(v['recorded_at'][:10])
+                    result['values'].append(float(v['value']))
+            except ValueError:
+                continue
+        return result
+    
+    vitals_data = {
+        'blood_pressure': safe_bp_values(bp_vitals),
+        'blood_sugar': safe_numeric_values(sugar_vitals),
+        'weight': safe_numeric_values(weight_vitals),
+        'temperature': safe_numeric_values(temp_vitals)
+    }
+    
+    return render_template('patient_vitals.html',
+                         vitals_analysis=vitals_analysis,
+                         vitals_data=vitals_data)
+
+
+@patient_bp.route('/log-vital', methods=['POST'])
+@role_required('PATIENT')
+def log_vital():
+    """
+    Log a new vital reading
+    """
+    user_id = session.get('user_id')
+    vital_type = request.form.get('vital_type')
+    notes = request.form.get('notes')
+    
+    # Extract value based on vital type
+    if vital_type == 'blood_pressure':
+        systolic = request.form.get('systolic')
+        diastolic = request.form.get('diastolic')
+        value = f"{systolic}/{diastolic}"
+        unit = "mmHg"
+    elif vital_type == 'blood_sugar':
+        value = request.form.get('sugar_value')
+        unit = "mg/dL"
+    elif vital_type == 'weight':
+        value = request.form.get('weight_value')
+        unit = "kg"
+    elif vital_type == 'temperature':
+        value = request.form.get('temp_value')
+        unit = "°F"
+    else:
+        flash('Invalid vital type', 'danger')
+        return redirect(url_for('patient.vitals'))
+    
+    try:
+        create_vital_sign(user_id, vital_type, value, unit, recorded_by=user_id, notes=notes)
+        flash('Vital reading logged successfully!', 'success')
+    except Exception as e:
+        flash(f'Error logging vital: {str(e)}', 'danger')
+    
+    return redirect(url_for('patient.vitals'))

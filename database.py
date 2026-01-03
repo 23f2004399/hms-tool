@@ -3,8 +3,21 @@ Database Connection and Initialization for MediFriend
 """
 import sqlite3
 import os
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
+import secrets
+import string
 from models import ALL_MODELS
+
+# IST timezone (UTC+5:30)
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def get_ist_now():
+    """Get current datetime in IST"""
+    return datetime.now(IST)
+
+def get_ist_today():
+    """Get current date in IST"""
+    return get_ist_now().date()
 
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'hms.db')
@@ -101,6 +114,85 @@ def execute_query(query, params=(), fetchone=False, fetchall=False, commit=False
         conn.close()
 
 
+def generate_meet_link():
+    """
+    Generate a unique Jitsi Meet link for online consultations
+    Jitsi Meet is free and works without API keys
+    Format: https://meet.jit.si/MediFriend-xxxxx (random 12-char code)
+    """
+    # Generate random string of 12 characters (letters + numbers)
+    chars = string.ascii_lowercase + string.digits
+    code = ''.join(secrets.choice(chars) for _ in range(12))
+    
+    # Use Jitsi Meet - free and works immediately without any setup
+    # Format: MediFriend-{random_code} to make room names unique
+    return f"https://meet.jit.si/MediFriend-{code}"
+
+
+def generate_ics_calendar(appointment_data):
+    """
+    Generate iCalendar (.ics) file content for appointment
+    Works with Google Calendar, Outlook, Apple Calendar, etc.
+    
+    Args:
+        appointment_data: dict with keys: patient_name, doctor_name, date, time, 
+                         consultation_mode, meet_link, clinic_address, symptoms
+    
+    Returns:
+        str: iCalendar format content
+    """
+    # Parse appointment date and time
+    appointment_datetime = datetime.strptime(
+        f"{appointment_data['date']} {appointment_data['time']}", 
+        "%Y-%m-%d %H:%M"
+    )
+    
+    # Calculate end time (assume 30 min consultation)
+    from datetime import timedelta
+    end_datetime = appointment_datetime + timedelta(minutes=30)
+    
+    # Format dates in iCalendar format (YYYYMMDDTHHMMSS)
+    dtstart = appointment_datetime.strftime("%Y%m%dT%H%M%S")
+    dtend = end_datetime.strftime("%Y%m%dT%H%M%S")
+    dtstamp = get_ist_now().strftime("%Y%m%dT%H%M%S")
+    
+    # Generate unique ID
+    uid = f"{secrets.token_hex(8)}@medifriend.com"
+    
+    # Build description with meet link or clinic address
+    if appointment_data['consultation_mode'] == 'ONLINE':
+        location = "Online Video Consultation"
+        description = f"Online consultation via Jitsi Meet\\n\\nJoin Link: {appointment_data['meet_link']}"
+        if appointment_data.get('symptoms'):
+            description += f"\\n\\nSymptoms: {appointment_data['symptoms']}"
+    else:
+        location = appointment_data.get('clinic_address', 'Clinic')
+        description = f"Physical consultation at clinic\\n\\nAddress: {location}"
+        if appointment_data.get('symptoms'):
+            description += f"\\n\\nSymptoms: {appointment_data['symptoms']}"
+    
+    # Build iCalendar content
+    ics_content = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//MediFriend//Healthcare Management System//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:{uid}
+DTSTAMP:{dtstamp}
+DTSTART:{dtstart}
+DTEND:{dtend}
+SUMMARY:Medical Consultation - Dr. {appointment_data['doctor_name']}
+DESCRIPTION:{description}
+LOCATION:{location}
+STATUS:CONFIRMED
+SEQUENCE:0
+END:VEVENT
+END:VCALENDAR"""
+    
+    return ics_content
+
+
 def insert_user(full_name, email, password_hash, role, phone=None, gender=None, dob=None):
     """
     Insert a new user into the database
@@ -139,15 +231,15 @@ def insert_patient_details(user_id, blood_group=None, allergies=None, chronic_co
     return execute_query(query, (user_id, blood_group, allergies, chronic_conditions, emergency_contact), commit=True)
 
 
-def insert_doctor_details(user_id, specialization, qualification=None, experience_years=0, consultation_fee=0.0, schedule_json=None):
+def insert_doctor_details(user_id, specialization, qualification=None, experience_years=0, consultation_fee=0.0, schedule_json=None, clinic_address=None, latitude=None, longitude=None, consultation_modes='PHYSICAL'):
     """
     Insert doctor-specific details
     """
     query = """
-        INSERT INTO doctor_details (user_id, specialization, qualification, experience_years, consultation_fee, schedule_json)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO doctor_details (user_id, specialization, qualification, experience_years, consultation_fee, schedule_json, clinic_address, latitude, longitude, consultation_modes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
-    return execute_query(query, (user_id, specialization, qualification, experience_years, consultation_fee, schedule_json), commit=True)
+    return execute_query(query, (user_id, specialization, qualification, experience_years, consultation_fee, schedule_json, clinic_address, latitude, longitude, consultation_modes), commit=True)
 
 
 def get_all_doctors():
@@ -156,10 +248,28 @@ def get_all_doctors():
     """
     query = """
         SELECT u.*, d.specialization, d.experience_years, d.consultation_fee,
-               d.average_rating, d.total_ratings
+               d.average_rating, d.total_ratings, d.clinic_address, d.latitude, d.longitude, d.consultation_modes, d.qualification
         FROM users u
         JOIN doctor_details d ON u.id = d.user_id
         WHERE u.role = 'DOCTOR'
+        ORDER BY d.average_rating DESC, u.full_name
+    """
+    return execute_query(query, fetchall=True)
+
+
+def get_doctors_with_location():
+    """
+    Get all doctors who have clinic location set (for map view)
+    """
+    query = """
+        SELECT u.id, u.full_name, u.email, u.phone,
+               d.specialization, d.experience_years, d.consultation_fee,
+               d.average_rating, d.total_ratings, d.clinic_address, d.latitude, d.longitude, d.consultation_modes, d.qualification
+        FROM users u
+        JOIN doctor_details d ON u.id = d.user_id
+        WHERE u.role = 'DOCTOR' 
+        AND d.latitude IS NOT NULL 
+        AND d.longitude IS NOT NULL
         ORDER BY d.average_rating DESC, u.full_name
     """
     return execute_query(query, fetchall=True)
@@ -230,15 +340,20 @@ def update_doctor_details(user_id, specialization, qualification, experience_yea
 
 # ==================== APPOINTMENT FUNCTIONS ====================
 
-def create_appointment(patient_id, doctor_id, date, time, symptoms=None):
+def create_appointment(patient_id, doctor_id, date, time, symptoms=None, consultation_mode='PHYSICAL'):
     """
     Create a new appointment and notify the doctor
     """
+    # Generate Meet link if consultation mode is ONLINE
+    meet_link = None
+    if consultation_mode == 'ONLINE':
+        meet_link = generate_meet_link()
+    
     query = """
-        INSERT INTO appointments (patient_id, doctor_id, date, time, symptoms, status)
-        VALUES (?, ?, ?, ?, ?, 'PENDING')
+        INSERT INTO appointments (patient_id, doctor_id, date, time, symptoms, status, consultation_mode, meet_link)
+        VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?)
     """
-    appointment_id = execute_query(query, (patient_id, doctor_id, date, time, symptoms), commit=True)
+    appointment_id = execute_query(query, (patient_id, doctor_id, date, time, symptoms, consultation_mode, meet_link), commit=True)
     
     # Get patient name for notification
     patient_query = "SELECT full_name FROM users WHERE id = ?"
@@ -246,7 +361,8 @@ def create_appointment(patient_id, doctor_id, date, time, symptoms=None):
     
     if appointment_id and patient:
         # Create notification for doctor
-        message = f"{patient['full_name']} has requested an appointment for {date} at {time}"
+        mode_text = "Online" if consultation_mode == 'ONLINE' else "Physical"
+        message = f"{patient['full_name']} has requested a {mode_text} appointment for {date} at {time}"
         create_notification(
             user_id=doctor_id,
             notification_type='APPOINTMENT_REQUESTED',
@@ -266,7 +382,8 @@ def get_patient_appointments(patient_id):
         SELECT a.*, 
                u.full_name as doctor_name, 
                d.specialization, 
-               d.consultation_fee
+               d.consultation_fee,
+               d.clinic_address
         FROM appointments a
         JOIN users u ON a.doctor_id = u.id
         JOIN doctor_details d ON u.id = d.user_id
@@ -347,9 +464,12 @@ def get_appointment_by_id(appointment_id):
 def get_doctor_stats(doctor_id):
     """
     Get statistics for doctor dashboard
-    Returns: pending appointments count, today's appointments count, total patients count
+    Returns: pending appointments, today's appointments, total patients, this month stats
     """
-    today = date.today().strftime('%Y-%m-%d')
+    today = get_ist_today().strftime('%Y-%m-%d')
+    
+    # Get current month and year
+    current_month = get_ist_today().strftime('%Y-%m')
     
     # Get pending appointments count
     pending_query = """
@@ -378,11 +498,62 @@ def get_doctor_stats(doctor_id):
     patients_result = execute_query(patients_query, (doctor_id,), fetchone=True)
     patients_count = patients_result['count'] if patients_result else 0
     
+    # Get this month's appointments count
+    month_appointments_query = """
+        SELECT COUNT(*) as count
+        FROM appointments
+        WHERE doctor_id = ? AND strftime('%Y-%m', date) = ? AND status IN ('CONFIRMED', 'COMPLETED')
+    """
+    month_appt_result = execute_query(month_appointments_query, (doctor_id, current_month), fetchone=True)
+    month_appointments = month_appt_result['count'] if month_appt_result else 0
+    
+    # Get this month's revenue
+    month_revenue_query = """
+        SELECT SUM(dd.consultation_fee) as revenue
+        FROM appointments a
+        JOIN doctor_details dd ON a.doctor_id = dd.user_id
+        WHERE a.doctor_id = ? AND strftime('%Y-%m', a.date) = ? AND a.status IN ('CONFIRMED', 'COMPLETED')
+    """
+    month_revenue_result = execute_query(month_revenue_query, (doctor_id, current_month), fetchone=True)
+    month_revenue = month_revenue_result['revenue'] if month_revenue_result and month_revenue_result['revenue'] else 0
+    
+    # Get average rating
+    rating_query = """
+        SELECT average_rating, total_ratings
+        FROM doctor_details
+        WHERE user_id = ?
+    """
+    rating_result = execute_query(rating_query, (doctor_id,), fetchone=True)
+    avg_rating = rating_result['average_rating'] if rating_result else 0
+    total_ratings = rating_result['total_ratings'] if rating_result else 0
+    
     return {
         'pending_appointments': pending_count,
         'today_appointments': today_count,
-        'total_patients': patients_count
+        'total_patients': patients_count,
+        'month_appointments': month_appointments,
+        'month_revenue': month_revenue,
+        'average_rating': avg_rating,
+        'total_ratings': total_ratings
     }
+
+
+def get_doctor_today_appointments(doctor_id):
+    """
+    Get today's appointments for doctor dashboard widget
+    """
+    today = get_ist_today().strftime('%Y-%m-%d')
+    
+    query = """
+        SELECT a.*, 
+               u.full_name as patient_name,
+               u.phone as patient_phone
+        FROM appointments a
+        JOIN users u ON a.patient_id = u.id
+        WHERE a.doctor_id = ? AND a.date = ? AND a.status IN ('CONFIRMED', 'COMPLETED')
+        ORDER BY a.time ASC
+    """
+    return execute_query(query, (doctor_id, today), fetchall=True)
 
 
 def update_appointment_status(appointment_id, status):
@@ -402,6 +573,108 @@ def cancel_appointment(appointment_id):
     Delete/cancel an appointment
     """
     query = "DELETE FROM appointments WHERE id = ?"
+    return execute_query(query, (appointment_id,), commit=True)
+
+
+def mark_follow_up_required(appointment_id, follow_up_date, doctor_id, patient_id):
+    """
+    Mark appointment as requiring follow-up and create notification
+    """
+    # Update appointment with follow-up details
+    query = """
+        UPDATE appointments
+        SET follow_up_required = 1, follow_up_date = ?
+        WHERE id = ?
+    """
+    execute_query(query, (follow_up_date, appointment_id), commit=True)
+    
+    # Create notification for patient
+    message = f"Your doctor recommends a follow-up visit on {follow_up_date}"
+    create_notification(
+        user_id=patient_id,
+        notification_type='FOLLOW_UP_REQUIRED',
+        message=message,
+        link='/patient/appointments',
+        appointment_id=appointment_id
+    )
+    
+    return True
+
+
+def create_follow_up_appointment(parent_appointment_id, patient_id, doctor_id, date, time):
+    """
+    Create a follow-up appointment linked to parent appointment
+    """
+    query = """
+        INSERT INTO appointments (patient_id, doctor_id, date, time, status, parent_appointment_id)
+        VALUES (?, ?, ?, ?, 'PENDING', ?)
+    """
+    return execute_query(query, (patient_id, doctor_id, date, time, parent_appointment_id), commit=True)
+
+
+def get_follow_up_recommendations(patient_id):
+    """
+    Get appointments that require follow-up but haven't been scheduled yet
+    """
+    query = """
+        SELECT 
+            a.id, a.date as original_date, a.follow_up_date,
+            u.full_name as doctor_name,
+            dd.specialization
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        LEFT JOIN doctor_details dd ON a.doctor_id = dd.user_id
+        WHERE a.patient_id = ? 
+        AND a.follow_up_required = 1
+        AND a.status = 'COMPLETED'
+        AND NOT EXISTS (
+            SELECT 1 FROM appointments f 
+            WHERE f.parent_appointment_id = a.id
+        )
+        ORDER BY a.follow_up_date ASC
+    """
+    return execute_query(query, (patient_id,), fetchall=True)
+
+
+def get_patient_follow_ups(patient_id):
+    """
+    Get all follow-up appointments for a patient (both pending and completed)
+    """
+    query = """
+        SELECT 
+            a.id,
+            a.date as appointment_date,
+            a.time as appointment_time,
+            a.follow_up_date,
+            a.status,
+            a.symptoms,
+            a.parent_appointment_id,
+            a.consultation_mode,
+            a.meet_link,
+            u.full_name as doctor_name,
+            dd.specialization,
+            dd.consultation_fee,
+            dd.clinic_address
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        LEFT JOIN doctor_details dd ON a.doctor_id = dd.user_id
+        WHERE a.patient_id = ?
+        AND a.follow_up_required = 1
+        AND a.status = 'COMPLETED'
+        ORDER BY a.date DESC
+    """
+    return execute_query(query, (patient_id,), fetchall=True)
+
+
+def mark_follow_up_complete(appointment_id):
+    """
+    Mark a follow-up appointment as complete (remove follow-up requirement)
+    """
+    query = """
+        UPDATE appointments
+        SET follow_up_required = 0
+        WHERE id = ?
+    """
     return execute_query(query, (appointment_id,), commit=True)
 
 
@@ -916,6 +1189,275 @@ def get_lab_report_trends(patient_id, test_type, parameter_name, limit=10):
                 })
     
     return trends
+
+
+def get_patient_history(patient_id):
+    """
+    Get complete patient history timeline: appointments, prescriptions, and lab reports
+    Returns combined data sorted by date
+    """
+    history = []
+    
+    # Get appointments
+    appointments_query = """
+        SELECT 
+            a.id, a.date, a.time, a.status, a.symptoms,
+            u.full_name as doctor_name,
+            dd.specialization, dd.consultation_fee
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        LEFT JOIN doctor_details dd ON a.doctor_id = dd.user_id
+        WHERE a.patient_id = ?
+        ORDER BY a.date DESC
+    """
+    appointments = execute_query(appointments_query, (patient_id,), fetchall=True)
+    
+    for apt in appointments:
+        history.append({
+            'type': 'appointment',
+            'date': apt['date'],
+            'time': apt.get('time', ''),
+            'title': f"Appointment with Dr. {apt['doctor_name']}",
+            'status': apt['status'],
+            'details': {
+                'specialization': apt['specialization'],
+                'symptoms': apt['symptoms'],
+                'consultation_fee': apt.get('consultation_fee')
+            }
+        })
+    
+    # Get prescriptions
+    prescriptions_query = """
+        SELECT 
+            p.id, p.created_at, p.diagnosis, p.medicines_json,
+            u.full_name as doctor_name,
+            dd.specialization
+        FROM prescriptions p
+        JOIN users u ON p.doctor_id = u.id
+        LEFT JOIN doctor_details dd ON p.doctor_id = dd.user_id
+        WHERE p.patient_id = ?
+        ORDER BY p.created_at DESC
+    """
+    prescriptions = execute_query(prescriptions_query, (patient_id,), fetchall=True)
+    
+    for presc in prescriptions:
+        # Count medicines
+        medicine_count = 0
+        if presc['medicines_json']:
+            try:
+                import json
+                medicines = json.loads(presc['medicines_json'])
+                medicine_count = len(medicines)
+            except:
+                pass
+        
+        history.append({
+            'type': 'prescription',
+            'date': presc['created_at'][:10],
+            'time': presc['created_at'][11:16] if len(presc['created_at']) > 10 else '',
+            'title': f"Prescription from Dr. {presc['doctor_name']}",
+            'status': 'completed',
+            'details': {
+                'specialization': presc['specialization'],
+                'diagnosis': presc['diagnosis'],
+                'medicine_count': medicine_count
+            }
+        })
+    
+    # Get lab reports
+    lab_reports_query = """
+        SELECT id, test_type, test_date, notes, extracted_values_json
+        FROM lab_reports
+        WHERE patient_id = ?
+        ORDER BY test_date DESC
+    """
+    lab_reports = execute_query(lab_reports_query, (patient_id,), fetchall=True)
+    
+    for report in lab_reports:
+        # Get key extracted values
+        key_values = {}
+        if report['extracted_values_json']:
+            try:
+                import json
+                all_values = json.loads(report['extracted_values_json'])
+                # Get first 3 values for display
+                key_values = dict(list(all_values.items())[:3])
+            except:
+                pass
+        
+        history.append({
+            'type': 'lab_report',
+            'date': report['test_date'],
+            'time': '',
+            'title': f"{report['test_type']} Test",
+            'status': 'completed',
+            'details': {
+                'notes': report['notes'],
+                'key_values': key_values
+            }
+        })
+    
+    # Sort all history by date (most recent first)
+    history.sort(key=lambda x: x['date'], reverse=True)
+    
+    return history
+
+
+# ==================== VITAL SIGNS ====================
+
+def create_vital_sign(patient_id, vital_type, value, unit, recorded_by=None, notes=None):
+    """
+    Log a new vital sign reading
+    vital_type: 'blood_pressure', 'blood_sugar', 'weight', 'temperature'
+    value: string (e.g., "120/80" for BP, "95" for sugar)
+    """
+    recorded_at = get_ist_now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    query = """
+        INSERT INTO vital_signs (patient_id, vital_type, value, unit, recorded_at, recorded_by, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """
+    return execute_query(query, (patient_id, vital_type, value, unit, recorded_at, recorded_by, notes), commit=True)
+
+
+def get_patient_vitals(patient_id, vital_type=None, days=30):
+    """
+    Get patient's vital signs history
+    If vital_type is None, returns all vitals
+    days: number of days to look back
+    """
+    from_date = (get_ist_now() - timedelta(days=days)).strftime('%Y-%m-%d')
+    
+    if vital_type:
+        query = """
+            SELECT vs.*, u.full_name as recorded_by_name
+            FROM vital_signs vs
+            LEFT JOIN users u ON vs.recorded_by = u.id
+            WHERE vs.patient_id = ? AND vs.vital_type = ? AND DATE(vs.recorded_at) >= ?
+            ORDER BY vs.recorded_at DESC
+        """
+        return execute_query(query, (patient_id, vital_type, from_date), fetchall=True)
+    else:
+        query = """
+            SELECT vs.*, u.full_name as recorded_by_name
+            FROM vital_signs vs
+            LEFT JOIN users u ON vs.recorded_by = u.id
+            WHERE vs.patient_id = ? AND DATE(vs.recorded_at) >= ?
+            ORDER BY vs.recorded_at DESC
+        """
+        return execute_query(query, (patient_id, from_date), fetchall=True)
+
+
+def analyze_vital_trends(patient_id, vital_type):
+    """
+    Analyze trends for a specific vital type
+    Returns: {
+        'current': latest value,
+        'trend': 'increasing'/'decreasing'/'stable',
+        'alert': True/False,
+        'alert_message': string
+    }
+    """
+    # Get last 14 days of data
+    recent_vitals = get_patient_vitals(patient_id, vital_type, days=14)
+    
+    if not recent_vitals or len(recent_vitals) < 2:
+        return {
+            'current': None,
+            'trend': 'stable',
+            'alert': False,
+            'alert_message': None
+        }
+    
+    # Split into recent week and previous week
+    mid_point = len(recent_vitals) // 2
+    recent_week = recent_vitals[:mid_point] if mid_point > 0 else recent_vitals
+    previous_week = recent_vitals[mid_point:] if mid_point > 0 else []
+    
+    current_value = recent_vitals[0]['value']
+    
+    # Calculate average for trend (simplified for numeric vitals)
+    def extract_numeric(value, vital_type):
+        """Extract numeric value from vital reading"""
+        if vital_type == 'blood_pressure':
+            # Use systolic (first number)
+            return float(value.split('/')[0])
+        elif vital_type == 'weight':
+            return float(value)
+        elif vital_type == 'blood_sugar':
+            return float(value)
+        elif vital_type == 'temperature':
+            return float(value)
+        return 0
+    
+    try:
+        recent_avg = sum(extract_numeric(v['value'], vital_type) for v in recent_week) / len(recent_week)
+        previous_avg = sum(extract_numeric(v['value'], vital_type) for v in previous_week) / len(previous_week) if previous_week else recent_avg
+        
+        # Determine trend
+        diff_percent = ((recent_avg - previous_avg) / previous_avg * 100) if previous_avg > 0 else 0
+        
+        if diff_percent > 5:
+            trend = 'increasing'
+        elif diff_percent < -5:
+            trend = 'decreasing'
+        else:
+            trend = 'stable'
+        
+        # Check for alerts based on normal ranges
+        alert = False
+        alert_message = None
+        
+        current_numeric = extract_numeric(current_value, vital_type)
+        
+        if vital_type == 'blood_pressure':
+            systolic = current_numeric
+            if systolic > 140:
+                alert = True
+                alert_message = "High blood pressure detected (>140 systolic)"
+            elif systolic < 90:
+                alert = True
+                alert_message = "Low blood pressure detected (<90 systolic)"
+        
+        elif vital_type == 'blood_sugar':
+            if current_numeric > 140:
+                alert = True
+                alert_message = "High blood sugar detected (>140 mg/dL)"
+            elif current_numeric < 70:
+                alert = True
+                alert_message = "Low blood sugar detected (<70 mg/dL)"
+        
+        elif vital_type == 'temperature':
+            if current_numeric > 99.5:
+                alert = True
+                alert_message = "Fever detected (>99.5°F)"
+            elif current_numeric < 97:
+                alert = True
+                alert_message = "Low temperature detected (<97°F)"
+        
+        elif vital_type == 'weight':
+            # Check for rapid weight change (>5% in 2 weeks)
+            if abs(diff_percent) > 5:
+                alert = True
+                direction = "gain" if diff_percent > 0 else "loss"
+                alert_message = f"Rapid weight {direction} detected ({abs(diff_percent):.1f}%)"
+        
+        return {
+            'current': current_value,
+            'trend': trend,
+            'alert': alert,
+            'alert_message': alert_message,
+            'recent_avg': round(recent_avg, 1),
+            'previous_avg': round(previous_avg, 1)
+        }
+    
+    except Exception as e:
+        return {
+            'current': current_value,
+            'trend': 'stable',
+            'alert': False,
+            'alert_message': None
+        }
 
 
 # Run initialization if executed directly

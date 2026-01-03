@@ -134,6 +134,55 @@
         </div>
       </div>
       
+      <!-- Clinic Location -->
+      <h3 class="section-title">Clinic Location</h3>
+      
+      <div class="form-row">
+        <div class="form-group full-width">
+          <label for="clinic_address">
+            <i class="fas fa-map-marker-alt"></i> Clinic Address *
+          </label>
+          <textarea id="clinic_address" name="clinic_address" required 
+                    placeholder="Enter your clinic's complete address (e.g., 123 Medical Center, MG Road, Bangalore, Karnataka 560001)" 
+                    class="form-control address-input" rows="3"></textarea>
+          <small class="help-text">
+            <i class="fas fa-info-circle"></i> This address will be used to show your clinic on the map for patients to find you easily
+          </small>
+        </div>
+      </div>
+      
+      <!-- Consultation Modes -->
+      <h3 class="section-title">Consultation Modes</h3>
+      
+      <div class="form-row">
+        <div class="form-group full-width">
+          <label>
+            <i class="fas fa-video"></i> Consultation Modes Offered *
+          </label>
+          <div class="consultation-modes">
+            <label class="checkbox-label">
+              <input type="checkbox" name="consultation_modes" value="PHYSICAL" checked>
+              <span class="checkbox-custom"></span>
+              <span class="checkbox-text">
+                <i class="fas fa-hospital"></i> Physical Consultation
+                <small>In-person visit at your clinic</small>
+              </span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="consultation_modes" value="ONLINE">
+              <span class="checkbox-custom"></span>
+              <span class="checkbox-text">
+                <i class="fas fa-video"></i> Online Consultation
+                <small>Video call via Jitsi Meet (Free & Secure)</small>
+              </span>
+            </label>
+          </div>
+          <small class="help-text">
+            <i class="fas fa-info-circle"></i> Select the consultation modes you want to offer to patients
+          </small>
+        </div>
+      </div>
+      
       <!-- Security -->
       <h3 class="section-title">Security</h3>
       
@@ -325,6 +374,101 @@
 
   .auth-footer a:hover {
     text-decoration: underline;
+  }
+  
+  .full-width {
+    grid-column: 1 / -1;
+  }
+  
+  .address-input {
+    resize: vertical;
+    font-family: inherit;
+    line-height: 1.6;
+  }
+  
+  .help-text {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    color: #718096;
+    font-size: 0.85rem;
+  }
+  
+  .help-text i {
+    color: #667eea;
+    font-size: 0.9rem;
+  }
+  
+  .consultation-modes {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 10px;
+  }
+  
+  .checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 15px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+  }
+  
+  .checkbox-label:hover {
+    border-color: #667eea;
+    background: #f7fafc;
+  }
+  
+  .checkbox-label input[type="checkbox"] {
+    display: none;
+  }
+  
+  .checkbox-custom {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #cbd5e0;
+    border-radius: 6px;
+    position: relative;
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: all 0.3s ease;
+  }
+  
+  .checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+  }
+  
+  .checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+    content: "✓";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+  }
+  
+  .checkbox-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .checkbox-text i {
+    color: #667eea;
+    margin-right: 8px;
+  }
+  
+  .checkbox-text small {
+    color: #718096;
+    font-size: 0.85rem;
   }
 
   @media (max-width: 768px) {

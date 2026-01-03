@@ -46,7 +46,26 @@
           <i class="fas fa-info-circle"></i>
           <span>Booked on {{ appointment.created_at[:10] }}</span>
         </div>
+        <div class="detail-item">
+          {% if appointment.consultation_mode == 'ONLINE' %}
+            <i class="fas fa-video"></i>
+            <span class="mode-badge mode-online">Online Consultation</span>
+          {% else %}
+            <i class="fas fa-hospital"></i>
+            <span class="mode-badge mode-physical">Physical Visit</span>
+          {% endif %}
+        </div>
       </div>
+      
+      {% if appointment.consultation_mode == 'ONLINE' and appointment.meet_link %}
+      <div class="meet-link-section">
+        <strong><i class="fas fa-video"></i> Meeting Link:</strong>
+        <a href="{{ appointment.meet_link }}" target="_blank" class="meet-link-button">
+          <i class="fas fa-external-link-alt"></i> {{ appointment.meet_link }}
+        </a>
+        <small class="meet-help">Share this link with your patient for the online consultation</small>
+      </div>
+      {% endif %}
       
       {% if appointment.symptoms %}
       <div class="symptoms-section">
@@ -69,6 +88,9 @@
           </button>
         </form>
         {% elif appointment.status == 'CONFIRMED' %}
+        <a href="{{ url_for('doctor.download_calendar', appointment_id=appointment.id) }}" class="btn-calendar">
+          <i class="fas fa-calendar-plus"></i> Add to Calendar
+        </a>
         <form method="POST" action="{{ url_for('doctor.complete_appointment', appointment_id=appointment.id) }}" style="display: inline;">
           <button type="submit" class="btn-complete">
             <i class="fas fa-check-circle"></i> Mark as Completed
@@ -77,10 +99,27 @@
         <a href="{{ url_for('doctor.write_prescription', patient_id=appointment.patient_id, appointment_id=appointment.id) }}" class="btn-prescription">
           <i class="fas fa-prescription"></i> Write Prescription
         </a>
+        <button type="button" class="btn-follow-up" onclick="showFollowUpModal({{ appointment.id }}, '{{ appointment.patient_name }}')">
+          <i class="fas fa-calendar-plus"></i> Schedule Follow-up
+        </button>
         {% elif appointment.status == 'COMPLETED' %}
         <span class="completed-label">
           <i class="fas fa-check-double"></i> Appointment completed
         </span>
+        {% if not appointment.follow_up_required %}
+        <button type="button" class="btn-follow-up-small" onclick="showFollowUpModal({{ appointment.id }}, '{{ appointment.patient_name }}')">
+          <i class="fas fa-calendar-plus"></i> Add Follow-up
+        </button>
+        {% else %}
+        <span class="follow-up-badge">
+          <i class="fas fa-redo"></i> Follow-up on {{ appointment.follow_up_date }}
+        </span>
+        <a href="{{ url_for('doctor.complete_follow_up', appointment_id=appointment.id) }}" 
+           class="btn-complete-followup"
+           onclick="return confirm('Mark this follow-up as complete?');">
+          <i class="fas fa-check-circle"></i> Mark Complete
+        </a>
+        {% endif %}
         {% endif %}
       </div>
     </div>
@@ -100,6 +139,46 @@
     </a>
   </div>
 </div>
+
+<!-- Follow-up Modal -->
+<div id="followUpModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <span class="modal-close" onclick="closeFollowUpModal()">&times;</span>
+    <h2><i class="fas fa-calendar-plus"></i> Schedule Follow-up Visit</h2>
+    <form id="followUpForm" method="POST" action="{{ url_for('doctor.schedule_follow_up') }}">
+      <input type="hidden" name="appointment_id" id="appointmentId">
+      
+      <div class="form-group">
+        <label>Patient Name</label>
+        <input type="text" id="patientName" readonly>
+      </div>
+      
+      <div class="form-group">
+        <label for="follow_up_date">
+          <i class="fas fa-calendar"></i> Recommended Follow-up Date
+        </label>
+        <input type="date" name="follow_up_date" id="follow_up_date" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="follow_up_notes">
+          <i class="fas fa-sticky-note"></i> Follow-up Notes (Optional)
+        </label>
+        <textarea name="follow_up_notes" id="follow_up_notes" rows="3" placeholder="Reason for follow-up, specific checks needed, etc..."></textarea>
+      </div>
+      
+      <div class="modal-actions">
+        <button type="button" onclick="closeFollowUpModal()" class="btn-secondary">
+          <i class="fas fa-times"></i> Cancel
+        </button>
+        <button type="submit" class="btn-primary">
+          <i class="fas fa-check"></i> Schedule Follow-up
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_css %}
@@ -342,6 +421,26 @@
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   }
   
+  .btn-calendar {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+  }
+  
+  .btn-calendar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+  
   .completed-label {
     color: #6c757d;
     font-weight: 600;
@@ -373,6 +472,262 @@
   .info-card p {
     color: #666;
     font-size: 1.1rem;
+  }
+  
+  /* Follow-up Styles */
+  .btn-follow-up,
+  .btn-follow-up-small {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+  }
+  
+  .btn-follow-up-small {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+  
+  .btn-follow-up:hover,
+  .btn-follow-up-small:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+  
+  .follow-up-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border: 2px solid #667eea;
+    border-radius: 20px;
+    color: #667eea;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+  
+  .follow-up-badge i {
+    font-size: 0.9rem;
+  }
+  
+  .btn-complete-followup {
+    padding: 6px 14px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    text-decoration: none;
+  }
+  
+  .btn-complete-followup:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  }
+  
+  /* Consultation Mode Badges */
+  .mode-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  
+  .mode-online {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .mode-physical {
+    background: linear-gradient(135deg, #48c774 0%, #38a169 100%);
+    color: white;
+  }
+  
+  /* Meet Link Section */
+  .meet-link-section {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    border: 2px solid #667eea;
+  }
+  
+  .meet-link-section strong {
+    display: block;
+    margin-bottom: 10px;
+    color: #667eea;
+    font-size: 0.95rem;
+  }
+  
+  .meet-link-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s;
+    word-break: break-all;
+  }
+  
+  .meet-link-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  }
+  
+  .meet-help {
+    display: block;
+    margin-top: 10px;
+    color: #666;
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+  
+  /* Modal Styles */
+  .modal {
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    position: relative;
+  }
+  
+  .modal-close {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    color: #999;
+    cursor: pointer;
+    transition: color 0.3s;
+  }
+  
+  .modal-close:hover {
+    color: #667eea;
+  }
+  
+  .modal-content h2 {
+    margin-bottom: 25px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .modal-content h2 i {
+    color: #667eea;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+  }
+  
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: 'Poppins', sans-serif;
+    transition: all 0.3s;
+  }
+  
+  .form-group input:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .form-group input[readonly] {
+    background: #f5f5f5;
+    cursor: not-allowed;
+  }
+  
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 25px;
+  }
+  
+  .modal-actions .btn-primary,
+  .modal-actions .btn-secondary {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+  }
+  
+  .modal-actions .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .modal-actions .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  }
+  
+  .modal-actions .btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+  }
+  
+  .modal-actions .btn-secondary:hover {
+    background: #f5f5f5;
   }
   
   .back-link {
@@ -425,4 +780,32 @@
     }
   }
 </style>
+
+<script>
+function showFollowUpModal(appointmentId, patientName) {
+  document.getElementById('appointmentId').value = appointmentId;
+  document.getElementById('patientName').value = patientName;
+  
+  // Set minimum date to tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().split('T')[0];
+  document.getElementById('follow_up_date').setAttribute('min', minDate);
+  
+  document.getElementById('followUpModal').style.display = 'flex';
+}
+
+function closeFollowUpModal() {
+  document.getElementById('followUpModal').style.display = 'none';
+  document.getElementById('followUpForm').reset();
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+  const modal = document.getElementById('followUpModal');
+  if (event.target == modal) {
+    closeFollowUpModal();
+  }
+}
+</script>
 {% endblock %}

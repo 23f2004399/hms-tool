@@ -31,6 +31,15 @@
         </select>
       </div>
       
+      <!-- Custom Test Type (shown when Other is selected) -->
+      <div class="form-group" id="customTestTypeGroup" style="display: none;">
+        <label for="custom_test_type">
+          <i class="fas fa-edit"></i> Specify Test Type
+        </label>
+        <input type="text" name="custom_test_type" id="custom_test_type" placeholder="Enter test type (e.g., Allergy Test, ECG, X-Ray)">
+        <small class="help-text">Please specify the type of test you're uploading</small>
+      </div>
+      
       <!-- Test Date -->
       <div class="form-group">
         <label for="test_date">
@@ -167,6 +176,14 @@
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  .help-text {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.85rem;
+    color: #999;
+    font-style: italic;
   }
   
   .file-upload-wrapper {
@@ -357,6 +374,22 @@
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('test_date').value = today;
     document.getElementById('test_date').max = today;
+    
+    // Handle test type selection
+    const testTypeSelect = document.getElementById('test_type');
+    const customTestTypeGroup = document.getElementById('customTestTypeGroup');
+    const customTestTypeInput = document.getElementById('custom_test_type');
+    
+    testTypeSelect.addEventListener('change', function() {
+      if (this.value === 'Other') {
+        customTestTypeGroup.style.display = 'block';
+        customTestTypeInput.required = true;
+      } else {
+        customTestTypeGroup.style.display = 'none';
+        customTestTypeInput.required = false;
+        customTestTypeInput.value = '';
+      }
+    });
     
     // File preview
     const fileInput = document.getElementById('test_report');

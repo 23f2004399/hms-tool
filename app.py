@@ -4,6 +4,7 @@ import google.generativeai as genai
 import uuid
 import json
 from datetime import datetime
+from database import get_ist_now
 
 # Import configuration and routes
 from config import Config
@@ -52,7 +53,7 @@ def calculate_age_filter(dob_str):
         if not dob_str:
             return None
         dob = datetime.strptime(dob_str, '%Y-%m-%d')
-        today = datetime.today()
+        today = get_ist_now()
         age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
         return age
     except:
