@@ -1460,6 +1460,391 @@ def analyze_vital_trends(patient_id, vital_type):
         }
 
 
+def get_patient_recent_vitals(patient_id):
+    """
+    Get patient's most recent vitals WITH TREND ANALYSIS for chatbot context.
+    Includes current value, 7-day averages, trend direction, percentage change, and alerts.
+    Returns formatted string with comprehensive vitals data.
+    """
+    today = get_ist_today().strftime('%Y-%m-%d')
+    yesterday = (get_ist_now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    vital_types = ['blood_pressure', 'blood_sugar', 'weight', 'temperature']
+    vitals_summary = []
+    
+    for vital_type in vital_types:
+        # Try today first
+        query = """
+            SELECT value, unit, recorded_at
+            FROM vital_signs
+            WHERE patient_id = ? AND vital_type = ? AND DATE(recorded_at) = ?
+            ORDER BY recorded_at DESC
+            LIMIT 1
+        """
+        result = execute_query(query, (patient_id, vital_type, today), fetchone=True)
+        
+        # If not today, try yesterday
+        if not result:
+            result = execute_query(query, (patient_id, vital_type, yesterday), fetchone=True)
+        
+        # If still not found, get the last available entry
+        if not result:
+            query_last = """
+                SELECT value, unit, recorded_at
+                FROM vital_signs
+                WHERE patient_id = ? AND vital_type = ?
+                ORDER BY recorded_at DESC
+                LIMIT 1
+            """
+            result = execute_query(query_last, (patient_id, vital_type), fetchone=True)
+        
+        # Format the vital sign WITH TREND ANALYSIS
+        if result:
+            value = result['value']
+            unit = result['unit']
+            recorded_date = result['recorded_at'][:10]
+            
+            # Determine when it was recorded
+            if recorded_date == today:
+                when = "today"
+            elif recorded_date == yesterday:
+                when = "yesterday"
+            else:
+                when = f"on {recorded_date}"
+            
+            # Get trend analysis
+            trend_data = analyze_vital_trends(patient_id, vital_type)
+            
+            # Format display name
+            vital_names = {
+                'blood_pressure': 'Blood Pressure',
+                'blood_sugar': 'Blood Sugar',
+                'weight': 'Weight',
+                'temperature': 'Temperature'
+            }
+            
+            # Build comprehensive vital summary
+            vital_line = f"{vital_names[vital_type]}: {value} {unit} ({when})"
+            
+            # Add trend analysis if available
+            if trend_data and trend_data.get('recent_avg'):
+                recent_avg = trend_data['recent_avg']
+                previous_avg = trend_data.get('previous_avg', 'N/A')
+                trend = trend_data['trend']
+                
+                # Calculate percentage change
+                if previous_avg != 'N/A' and previous_avg and recent_avg:
+                    try:
+                        if vital_type == 'blood_pressure':
+                            # For BP, use systolic for percentage
+                            recent_sys = float(str(recent_avg).split('/')[0]) if '/' in str(recent_avg) else float(recent_avg)
+                            prev_sys = float(str(previous_avg).split('/')[0]) if '/' in str(previous_avg) else float(previous_avg)
+                            pct_change = ((recent_sys - prev_sys) / prev_sys) * 100
+                        else:
+                            pct_change = ((float(recent_avg) - float(previous_avg)) / float(previous_avg)) * 100
+                        
+                        trend_symbol = "↑" if trend == "increasing" else "↓" if trend == "decreasing" else "→"
+                        vital_line += f" | 7-day avg: {recent_avg} {unit}, Trend: {trend.capitalize()} {trend_symbol} {abs(pct_change):.1f}%"
+                    except:
+                        vital_line += f" | 7-day avg: {recent_avg} {unit}, Trend: {trend.capitalize()}"
+                else:
+                    vital_line += f" | 7-day avg: {recent_avg} {unit}, Trend: {trend.capitalize()}"
+                
+                # Add alert if present
+                if trend_data.get('alert') and trend_data.get('alert_message'):
+                    vital_line += f" | ⚠️ ALERT: {trend_data['alert_message']}"
+            
+            vitals_summary.append(vital_line)
+    
+    if vitals_summary:
+        return "Patient's Recent Vitals:\n" + "\n".join(vitals_summary)
+    else:
+        return "No vital signs recorded yet."
+
+
+def get_patient_medical_summary(patient_id):
+    """
+    Get compact medical summary for chatbot context (appointments + prescriptions).
+    Includes: last appointment, next appointment, active prescriptions count, past visits count.
+    Returns formatted string with essential medical history.
+    """
+    summary_parts = []
+    
+    # Get last completed appointment
+    last_appt_query = """
+        SELECT a.date, a.time,
+               u.full_name as doctor_name,
+               d.specialization,
+               p.id as prescription_id,
+               p.diagnosis,
+               p.medicines_json
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        JOIN doctor_details d ON u.id = d.user_id
+        LEFT JOIN prescriptions p ON a.id = p.appointment_id
+        WHERE a.patient_id = ? AND a.status = 'COMPLETED'
+        ORDER BY a.date DESC, a.time DESC
+        LIMIT 1
+    """
+    last_appt = execute_query(last_appt_query, (patient_id,), fetchone=True)
+    
+    if last_appt:
+        doctor_info = f"Dr. {last_appt['doctor_name']} ({last_appt['specialization']})"
+        appt_date = last_appt['date']
+        
+        last_appt_text = f"Last Appointment: {doctor_info} on {appt_date}"
+        
+        if last_appt['prescription_id'] and last_appt['medicines_json']:
+            import json
+            try:
+                meds = json.loads(last_appt['medicines_json'])
+                if meds:
+                    med_count = len(meds)
+                    first_med = meds[0]
+                    med_name = first_med.get('name', 'Unknown')
+                    dosage = first_med.get('dosage', '')
+                    timing = first_med.get('timing', '')
+                    
+                    if med_count == 1:
+                        last_appt_text += f"\n  Prescribed: {med_name} {dosage} ({timing})"
+                    else:
+                        last_appt_text += f"\n  Prescribed: {med_name} {dosage} ({timing}) + {med_count - 1} more"
+            except:
+                pass
+        
+        summary_parts.append(last_appt_text)
+    
+    # Get next upcoming appointment
+    next_appt_query = """
+        SELECT a.date, a.time, a.symptoms, a.status,
+               u.full_name as doctor_name,
+               d.specialization
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        JOIN doctor_details d ON u.id = d.user_id
+        WHERE a.patient_id = ? AND a.status IN ('PENDING', 'CONFIRMED')
+        AND a.date >= ?
+        ORDER BY a.date ASC, a.time ASC
+        LIMIT 1
+    """
+    today = get_ist_today().strftime('%Y-%m-%d')
+    next_appt = execute_query(next_appt_query, (patient_id, today), fetchone=True)
+    
+    if next_appt:
+        doctor_info = f"Dr. {next_appt['doctor_name']} ({next_appt['specialization']})"
+        appt_date = next_appt['date']
+        appt_time = next_appt['time']
+        reason = next_appt['symptoms'] or "Checkup"
+        status = next_appt['status']
+        
+        next_appt_text = f"Next Appointment: {doctor_info} on {appt_date} at {appt_time} (Status: {status})\n  Reason: {reason}"
+        summary_parts.append(next_appt_text)
+    
+    # Get total prescription count
+    prescription_count_query = """
+        SELECT COUNT(*) as count
+        FROM prescriptions
+        WHERE patient_id = ?
+    """
+    presc_count = execute_query(prescription_count_query, (patient_id,), fetchone=True)
+    if presc_count and presc_count['count'] > 0:
+        summary_parts.append(f"Total Prescriptions Received: {presc_count['count']}")
+    
+    # Get appointment statistics
+    appointment_stats_query = """
+        SELECT 
+            COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) as completed_count,
+            COUNT(CASE WHEN status IN ('PENDING', 'CONFIRMED') THEN 1 END) as upcoming_count,
+            COUNT(*) as total_count
+        FROM appointments
+        WHERE patient_id = ?
+    """
+    appt_stats = execute_query(appointment_stats_query, (patient_id,), fetchone=True)
+    
+    if appt_stats and appt_stats['total_count'] > 0:
+        stats_text = f"Appointment History: {appt_stats['completed_count']} completed"
+        if appt_stats['upcoming_count'] > 0:
+            stats_text += f", {appt_stats['upcoming_count']} upcoming/pending"
+        summary_parts.append(stats_text)
+    
+    if summary_parts:
+        return "Medical History Summary:\n" + "\n".join(summary_parts)
+    else:
+        return "No medical history found."
+
+
+def get_appointment_full_details(patient_id, appointment_id):
+    """
+    FUNCTION CALLING: Get complete details of a specific appointment.
+    Returns: appointment info, diagnosis, full prescription with all medicines.
+    """
+    query = """
+        SELECT a.*,
+               u.full_name as doctor_name,
+               d.specialization,
+               d.qualification,
+               p.diagnosis,
+               p.medicines_json,
+               p.notes
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        JOIN doctor_details d ON u.id = d.user_id
+        LEFT JOIN prescriptions p ON a.id = p.appointment_id
+        WHERE a.patient_id = ? AND a.id = ?
+    """
+    result = execute_query(query, (patient_id, appointment_id), fetchone=True)
+    
+    if not result:
+        return {"error": "Appointment not found"}
+    
+    import json
+    medicines = []
+    if result['medicines_json']:
+        try:
+            medicines = json.loads(result['medicines_json'])
+        except:
+            pass
+    
+    return {
+        "appointment_id": result['id'],
+        "doctor_name": result['doctor_name'],
+        "specialization": result['specialization'],
+        "date": result['date'],
+        "time": result['time'],
+        "symptoms": result['symptoms'],
+        "diagnosis": result['diagnosis'],
+        "medicines": medicines,
+        "notes": result['notes'],
+        "status": result['status']
+    }
+
+
+def get_all_patient_prescriptions_detailed(patient_id):
+    """
+    FUNCTION CALLING: Get ALL prescriptions with complete medication details.
+    Returns: list of all prescriptions with medicines breakdown.
+    """
+    prescriptions = get_patient_prescriptions(patient_id)
+    
+    if not prescriptions:
+        return {"message": "No prescriptions found"}
+    
+    import json
+    detailed_list = []
+    
+    for presc in prescriptions:
+        medicines = []
+        if presc['medicines_json']:
+            try:
+                medicines = json.loads(presc['medicines_json'])
+            except:
+                pass
+        
+        detailed_list.append({
+            "prescription_id": presc['id'],
+            "doctor_name": presc['doctor_name'],
+            "specialization": presc['specialization'],
+            "date": presc['created_at'][:10],
+            "diagnosis": presc['diagnosis'],
+            "medicines": medicines,
+            "notes": presc['notes']
+        })
+    
+    return {"prescriptions": detailed_list, "total_count": len(detailed_list)}
+
+
+def get_past_appointments_filtered(patient_id, limit=10, doctor_name=None, date_from=None):
+    """
+    FUNCTION CALLING: Get past appointments with optional filters.
+    Can filter by doctor name and date range.
+    """
+    query = """
+        SELECT a.id, a.date, a.time, a.symptoms,
+               u.full_name as doctor_name,
+               d.specialization,
+               p.id as has_prescription,
+               p.diagnosis
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        JOIN doctor_details d ON u.id = d.user_id
+        LEFT JOIN prescriptions p ON a.id = p.appointment_id
+        WHERE a.patient_id = ? AND a.status = 'COMPLETED'
+    """
+    
+    params = [patient_id]
+    
+    if doctor_name:
+        query += " AND u.full_name LIKE ?"
+        params.append(f"%{doctor_name}%")
+    
+    if date_from:
+        query += " AND a.date >= ?"
+        params.append(date_from)
+    
+    query += " ORDER BY a.date DESC, a.time DESC LIMIT ?"
+    params.append(limit)
+    
+    results = execute_query(query, tuple(params), fetchall=True)
+    
+    if not results:
+        return {"message": "No past appointments found", "appointments": []}
+    
+    appointments = []
+    for appt in results:
+        appointments.append({
+            "appointment_id": appt['id'],
+            "doctor_name": appt['doctor_name'],
+            "specialization": appt['specialization'],
+            "date": appt['date'],
+            "time": appt['time'],
+            "symptoms": appt['symptoms'],
+            "diagnosis": appt['diagnosis'],
+            "has_prescription": bool(appt['has_prescription'])
+        })
+    
+    return {"appointments": appointments, "total_count": len(appointments)}
+
+
+def get_all_appointments_summary(patient_id):
+    """
+    FUNCTION CALLING: Get ALL appointments (past, upcoming, confirmed, pending, rejected).
+    Returns complete appointment list with status for each.
+    """
+    query = """
+        SELECT a.id, a.date, a.time, a.symptoms, a.status, a.created_at,
+               u.full_name as doctor_name,
+               d.specialization,
+               p.id as has_prescription
+        FROM appointments a
+        JOIN users u ON a.doctor_id = u.id
+        JOIN doctor_details d ON u.id = d.user_id
+        LEFT JOIN prescriptions p ON a.id = p.appointment_id
+        WHERE a.patient_id = ?
+        ORDER BY a.date DESC, a.time DESC
+    """
+    
+    results = execute_query(query, (patient_id,), fetchall=True)
+    
+    if not results:
+        return {"message": "No appointments found", "appointments": []}
+    
+    appointments = []
+    for appt in results:
+        appointments.append({
+            "appointment_id": appt['id'],
+            "doctor_name": appt['doctor_name'],
+            "specialization": appt['specialization'],
+            "scheduled_date": appt['date'],
+            "scheduled_time": appt['time'],
+            "booked_on": appt['created_at'][:10],
+            "status": appt['status'],
+            "symptoms": appt['symptoms'],
+            "has_prescription": bool(appt['has_prescription'])
+        })
+    
+    return {"appointments": appointments, "total_count": len(appointments)}
+
+
 # Run initialization if executed directly
 if __name__ == "__main__":
     init_db()

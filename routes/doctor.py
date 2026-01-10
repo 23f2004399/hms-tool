@@ -10,6 +10,7 @@ from database import (
     delete_read_notifications, get_doctor_stats, search_patients, mark_follow_up_required,
     mark_follow_up_complete, generate_ics_calendar, get_doctor_today_appointments
 )
+from scheduler import create_medication_reminder
 import json
 
 doctor_bp = Blueprint('doctor', __name__, url_prefix='/doctor')
@@ -155,14 +156,54 @@ def write_prescription(patient_id, appointment_id):
         medicine_names = request.form.getlist('medicine_name[]')
         medicine_dosages = request.form.getlist('medicine_dosage[]')
         medicine_durations = request.form.getlist('medicine_duration[]')
+        medicine_frequencies = request.form.getlist('medicine_frequency[]')
+        medicine_foods = request.form.getlist('medicine_food[]')
         
-        for name, dosage, duration in zip(medicine_names, medicine_dosages, medicine_durations):
+        # Get timing checkboxes (they may have different array lengths)
+        medicine_timing_morning = request.form.getlist('medicine_timing_morning[]')
+        medicine_timing_afternoon = request.form.getlist('medicine_timing_afternoon[]')
+        medicine_timing_evening = request.form.getlist('medicine_timing_evening[]')
+        medicine_timing_night = request.form.getlist('medicine_timing_night[]')
+        
+        for idx, (name, dosage, duration) in enumerate(zip(medicine_names, medicine_dosages, medicine_durations)):
             if name.strip() and dosage.strip() and duration.strip():
-                medicines.append({
+                # Build timing array based on checkboxes
+                timing = []
+                if idx < len(medicine_timing_morning) and medicine_timing_morning[idx]:
+                    timing.append('Morning')
+                if idx < len(medicine_timing_afternoon) and medicine_timing_afternoon[idx]:
+                    timing.append('Afternoon')
+                if idx < len(medicine_timing_evening) and medicine_timing_evening[idx]:
+                    timing.append('Evening')
+                if idx < len(medicine_timing_night) and medicine_timing_night[idx]:
+                    timing.append('Night')
+                
+                medicine_data = {
                     'name': name.strip(),
                     'dosage': dosage.strip(),
-                    'duration': duration.strip()
-                })
+                    'duration': duration.strip() + ' days'
+                }
+                
+                # Add frequency if selected
+                if idx < len(medicine_frequencies) and medicine_frequencies[idx]:
+                    medicine_data['frequency'] = medicine_frequencies[idx]
+                
+                # Add timing if selected
+                if timing:
+                    medicine_data['timing'] = ', '.join(timing)
+                
+                # Add food relation if selected
+                if idx < len(medicine_foods) and medicine_foods[idx]:
+                    food_map = {
+                        'before_food': 'Before food',
+                        'after_food': 'After food',
+                        'with_food': 'With food',
+                        'empty_stomach': 'Empty stomach',
+                        'anytime': 'Anytime'
+                    }
+                    medicine_data['food'] = food_map.get(medicine_foods[idx], medicine_foods[idx])
+                
+                medicines.append(medicine_data)
         
         if not diagnosis:
             flash('Diagnosis is required', 'error')
@@ -194,6 +235,23 @@ def write_prescription(patient_id, appointment_id):
                 link='/patient/prescriptions',
                 prescription_id=prescription_id
             )
+            
+            # Create medication reminder if there are medicines with durations
+            try:
+                if medicines:
+                    # Get max duration from all medicines
+                    max_duration = 0
+                    for med in medicines:
+                        duration_str = med.get('duration', '0 days')
+                        # Extract number from "30 days"
+                        duration_days = int(duration_str.split()[0]) if duration_str.split()[0].isdigit() else 0
+                        max_duration = max(max_duration, duration_days)
+                    
+                    if max_duration > 0:
+                        create_medication_reminder(prescription_id, patient_id, max_duration)
+                        print(f"✅ Created medication reminder for prescription {prescription_id} ({max_duration} days)")
+            except Exception as e:
+                print(f"⚠️ Failed to create medication reminder: {e}")
             
             flash('Prescription created successfully', 'success')
             return redirect(url_for('doctor.appointments'))
